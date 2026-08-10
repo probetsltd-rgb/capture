@@ -1,0 +1,2 @@
+business_name,customer_ref,conversation_id,channel,first_message_date,last_message_date,message_count,conversation_type,intent,status,leakage_type,estimated_value,recoverable,notes,reviewed_by,review_date
+EXAMPLE Furniture Co,C1,WA-001,WhatsApp,2026-03-02,2026-03-02,4,sales enquiry,high,abandoned,customer showed buying intent but conversation ended,250000,maybe,Asked for delivery timeline to Lekki then went silent; no follow-up sent by business,Seun,2026-08-10

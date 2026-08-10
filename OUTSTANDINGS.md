@@ -1,0 +1,122 @@
+# CAPTURE — Outstandings
+
+Open dependencies, unresolved decisions, and known risks. Check this before assuming an account, integration, or decision is already in place — it keeps [PLANS.md](./PLANS.md) from silently drifting on unstated assumptions.
+
+## How to use this document
+
+- When an item is resolved, move it to the bottom of its section under a `### Resolved` subheading with the date and outcome — don't delete it, so we keep a decision trail.
+- If a phase-gate item in PLANS.md can't be completed because of something listed here, leave the checkbox unchecked and reference the item ID (e.g. `DEP-3`) in the checkbox's context.
+
+---
+
+## Process Deviations from Recommended Build Sequence
+
+| ID | Deviation | Decided | Notes |
+|---|---|---|---|
+| DEV-1 | Phase 0 real-business commercial validation deferred to beta. Phase 1 build is proceeding now against **simulated** data instead of waiting for real audits (PRD §43's recommended sequence puts Phase 0 completion before major platform development). | 2026-08-10, explicit founder instruction | Simulated data (clearly labeled `SIMULATED-*`) is being used as fixtures to build/test Phase 1 code — ingestion, classification, report generation, dashboard. **Hypotheses A1, A3, A4 remain unvalidated** — simulated data cannot provide evidence for them, only real audits can (see PLANS.md Hypotheses Tracker). `candidate_business_tracker.csv` and the real `conversation_log_template.csv`/`business_summary_template.csv` are unaffected and still the record of truth once real outreach starts. Before beta: (1) run real Phase 0 audits per `phase0/AUDIT_GUIDE.md`, (2) re-run Phase 1 gate tests against at least one real business's data, not just simulated fixtures — a build that only works on clean simulated data is not proof it works on messy real conversations. |
+| DEV-2 | Phase 2 (Recover) built as a **founder-operated semi-manual workflow** instead of the PRD §12-implied fully automated send/response-detection loop. The system identifies, scores, and schedules recovery targets; a human executes the actual WhatsApp contact and marks state transitions (`markContacted`/`markResponded`/`recordOutcome`). | 2026-08-11, my own scope call, not an explicit founder instruction | Root cause: Phase 1.4b (WhatsApp Business API) is blocked on `DEP-1`/`DEP-2` — outbound send and inbound response-detection have no real mechanism to run on. Rather than fake a send or skip Phase 2 outright, this leans into PRD §42's own "manual before automated" principle — the PRD's Recover workflow (§12) is fully human-executable, it just wasn't described that way. All the deterministic logic (eligibility, scoring, timing, the one-follow-up-max cap, stop-on-response) is real and tested against real data (TESTS.md 2026-08-11) — only the *execution* of the actual WhatsApp message is manual. Once DEP-1/DEP-2 clear, automating the send is additive (the `automations` table and its `pending`/`sent` states don't need to change), not a rebuild. Revisit whether this is still the right shape once real Phase 0 businesses are actually being recovered — a human manually messaging every dormant lead may not scale even for a small pilot batch. |
+| DEV-3 | Phase 3 (Prevent) channel connection (PRD §17A) skipped entirely for now — genuinely blocked, no manual substitute makes sense for a live two-way channel. Instead built and rigorously tested the response engine, safety constraints, escalation, kill switch, timers, and state machine using a **simulated-inbound-message harness** (`/admin/prevent/[businessId]`'s "Simulate an inbound message" form) as a stand-in for the live webhook. | 2026-08-11, my own scope call, not an explicit founder instruction | Unlike Recover, there's no "human executes it manually" substitute for Prevent's core value (instant automated response) — a human answering every enquiry in real time isn't Prevent, it's just customer service. So the scope call here is narrower than DEV-2: only the *channel* is stubbed out, not the workflow. Everything downstream of "a message arrived" is real, tested code (`handleInboundMessage()` in `web/src/lib/prevent/process.ts`) that a real webhook handler will call unchanged once DEP-1/DEP-2/DEP-4 clear. The two most safety-critical pieces (approved-knowledge-only constraint, kill switch) were adversarial- and race-condition-tested against the real model/real database, not just reasoned about — see TESTS.md 2026-08-11. |
+
+---
+
+## Open External Dependencies
+
+| ID | Item | Needed for | Status |
+|---|---|---|---|
+| DEP-1 | Meta Business account + WhatsApp Business Platform API access/approval | Phase 1.4b, Phase 2, Phase 3 | ⬜ Not started |
+| DEP-2 | Decision: direct-to-Meta Cloud API vs BSP (e.g. Twilio, 360dialog, Gupshup) | Phase 1.4b | ⬜ Open decision — see also PLANS.md AD-5 |
+| DEP-3 | Pre-approved WhatsApp message templates (required for business-initiated sends outside 24h session window) | Phase 2 (Recover sends), Phase 3 (follow-ups) | ⬜ Not started — depends on DEP-1/DEP-2 |
+| DEP-4 | Instagram messaging access (where "technically reliable" per PRD §17A) | Phase 3 | ⬜ Not started |
+| DEP-5 | ~~Vercel AI Gateway billing~~ | Phase 1.5 | ✅ Resolved 2026-08-10 — see Resolved section below |
+| DEP-7 | Production domain for capture.website / app | Phase 1.3 | ⬜ Not started — Vercel preview URL available once deployed, custom domain still open |
+| DEP-8 | At least one committed pilot business with real (or representative) WhatsApp export data | Phase 0 exit, Phase 1 gate | ⬜ Not started — see DEV-1, deferred to beta |
+| DEP-9 | `NEXT_PUBLIC_SITE_URL` for preview/production, and Supabase's Auth "Redirect URLs" allowlist configured to match | Phase 1.1 auth (magic-link emails), Phase 1.3 | ⬜ Not started — set for `development` only (`http://localhost:3000`) so far. Preview deployments get a new URL per deploy, which complicates the redirect allowlist; production is blocked on DEP-7. Until resolved, magic-link sign-in only works from local dev. |
+| DEP-10 | Vercel Cron on the **Hobby plan runs at most once per day** — confirmed from Vercel's own docs, not assumed. `/api/cron/escalation-timers` needs a ~10-minute cadence to match PRD §22's T+10/T+30 timers; on Hobby it simply won't fire often enough to be useful. Requires a Pro (or higher) plan. The route itself is correct and independently tested against real data (TESTS.md 2026-08-11) — this is purely a scheduling-frequency gap, not a logic gap. | Phase 3 | ⬜ Not started — route built and tested manually; automatic scheduling blocked on plan tier |
+| DEP-11 | `CRON_SECRET` not yet set for the **Preview** environment — `vercel env add` requires a git branch context this repo doesn't have yet (not pushed to GitHub / no remote). Development and Production are set. | Phase 3 | ⬜ Not started — low priority, only matters once preview deployments exist |
+
+---
+
+## Open Decisions Carried from PRD §47
+
+These are explicitly left open by the PRD itself. Do not lock them prematurely — informed by first real deployments.
+
+| Item | Notes |
+|---|---|
+| Exact pricing tiers (Recover, Prevent) | PRD §34 gives only indicative hypotheses (e.g. Prevent "from ₦150k/month") — not final |
+| Exact AI model/provider | Mitigated architecturally via AI Gateway (AD-3) but final provider choice still open |
+| Exact infrastructure | Stack decided (AD-1/AD-2) but specific hosting regions, BSP choice (DEP-2), etc. remain open |
+| Final dashboard UI | Recover/Prevent dashboards in PLANS.md are functionally scoped, not designed |
+| Exact conversation-volume tiers | Affects Recover pricing (PRD §34) |
+| Final Recover performance-fee model | PRD §34 floats "base fee + performance fee" as a hypothesis only |
+| CRM integrations | None planned for V1 (PRD §41 non-goal); revisit post-V1 |
+| Long-term product catalogue | Out of scope until V1 core test (PRD §50) is answered |
+| Whether Recover eventually becomes a capability inside Prevent | PRD §47 flags this explicitly as undecided — do not architect Recover as permanently standalone in a way that blocks this merge later |
+| Exact industry vertical focus | PRD §3 lists candidate verticals but does not commit to one |
+
+---
+
+## Compliance & Legal
+
+| Item | Status | Notes |
+|---|---|---|
+| NDPA (Nigeria Data Protection Act)-aligned privacy policy | ⬜ Not started | Needed before Phase 1 goes live with real pilot data |
+| Data Processing Agreement (DPA) template for business customers | ⬜ Not started | Needed for Find intake — businesses are giving us their customers' data |
+| Retention & deletion policy (defined period + process) | ⬜ Not started | Referenced in Cross-Cutting Security Workstream, PLANS.md |
+| Legal review of NDPA obligations given global-cloud hosting decision (AD-6) | ⬜ Not started | Confirm global hosting + safeguards is sufficient; flag if in-country hosting becomes a legal requirement, not just a preference |
+| Consent-flow copy for Find upload and channel-connect steps | ⬜ Not started | Must produce an auditable consent record, not just a UI checkbox |
+
+---
+
+## Known Risks / Unknowns
+
+Mirrors the Hypotheses Tracker in PLANS.md for quick scanning — see that table for phase mapping.
+
+- Conversation volume at target businesses may be lower than assumed (A1)
+- WhatsApp may not be the dominant/best channel for all target verticals (A2)
+- Actual leakage value may not be large enough to create buying urgency (A3)
+- Businesses may be reluctant to grant access to customer conversation data (A4) — directly affects Phase 1 pilot acquisition
+- Willingness to pay ₦150k+/month for Prevent is unproven (A5)
+- Trust in autonomous AI responses to real customers is unproven (A6) — mitigated by kill-switch and approved-knowledge constraints, but still a commercial risk
+- Attribution of recovered revenue may prove harder to get businesses to reliably self-report than assumed (A7)
+- Cross-industry reusability of the workflow is unproven (A8)
+- Same-day deployment may not hold once real-world catalogue/pricing complexity is encountered (A9)
+
+## Technical Risks
+
+- Meta's 24-hour customer-service session window and template-approval requirements (DEP-3) may slow down Recover/Prevent send timing in ways the PRD's workflow diagrams (§12, §16) don't account for — needs to be designed around, not discovered late
+- Instagram messaging reliability (PRD §17A: "where technically reliable") is unconfirmed — may need to be deprioritised if the API proves unreliable in practice
+- AI Gateway zero-retention guarantees vary by provider — must be verified per provider chosen (DEP-5), not assumed
+- `businesses.upload_token` (Phase 1.4a) never expires and isn't single-use — a leaked link (forwarded email, browser history on a shared device) grants upload access indefinitely. Acceptable for now since it only grants *upload*, not read access to existing data, but add expiry/one-time-use before this is relied on beyond early pilots
+- Phase 1.4a dropped `.zip`/media-inclusive export support entirely (V1 accepts `.txt` only) to avoid the zip-bomb/decompression attack surface. Matches `phase0/AUDIT_GUIDE.md`'s recommended "Export Chat → Without Media" flow, but a business that only knows how to export with media will hit a wall — revisit if this becomes a real onboarding blocker
+- Phase 1.5's PII redaction (`web/src/lib/classification/redact.ts`) only catches structured PII — phone numbers and emails via regex. It does **not** redact names appearing in free-text message bodies (a name-scrubbing regex/word-list produces too many false positives/negatives to be worth it). Acceptable for now since names alone are lower-sensitivity than phone/email, but worth revisiting with a proper NER approach if a business objects during a real Phase 0 audit
+- Phase 1.5 classification quality is unproven on real conversations and shows real run-to-run judgment variance on ambiguous cases even on identical input (observed: the same short "asked about delivery, no reply visible" transcript classified as `no_response`/`no_response` in one run and `unresolved`/`none` in another, both defensible reads of an inherently ambiguous transcript). This variance was observed on the free-tier model and persisted after upgrading to `anthropic/claude-haiku-4.5` — it's inherent to the taxonomy's ambiguity on short transcripts, not just a weak-model artifact. Do not treat classification output as ground truth until validated against real Phase 0 audit labels (`phase0/conversation_log_template.csv`) once real data exists
+- Phase 3 knowledge base ingestion (`/admin/prevent/[businessId]/knowledge`) is simple structured CRUD, not the "AI-assisted structuring" PRD §17B describes — a business can't paste an unstructured price list/FAQ doc and have it auto-organized; every item is entered field-by-field. Fine for a handful of items in testing, will be tedious for a real business's full catalogue
+- Phase 3's "Take Conversation" has no "Assign" routing (PRD §23 names both) — a human manually types who's taking it, there's no lead-routing logic (round-robin, product→salesperson, etc. per PRD §21) to auto-suggest who should
+- Phase 3's controlled follow-up cap (`MAX_AI_FOLLOWUPS`/`canSendFollowup()`) is real, correct, tested logic — but nothing calls it yet. There's no automated "customer went quiet after a response, wait N hours, send one follow-up" scheduling built, so the cap currently guards a feature that doesn't exist yet
+- Phase 3's Prevent Dashboard doesn't compute average response time (PRD §25 explicitly lists it) — logged as a gap rather than shown with a fake/placeholder value
+- Phase 3's deployment workflow (PRD §27–28: Connect → Business Info → Configure Rules → Test → Approve → Activate) is not built as a distinct guided flow — pieces of it exist standalone (knowledge base ≈ Business Info, the simulate-inbound harness ≈ Test) but there's no "Configure Rules", "Approve", or "Activate" step, and obviously no "Connect" given DEP-1/DEP-2/DEP-4
+
+---
+
+## Test Coverage Debt
+
+| ID | Item | Status | Notes |
+|---|---|---|---|
+| DEBT-1 | `phase0/parse_whatsapp_exports.py` has no automated/repeatable test suite | ⬜ Not started | Verified manually on 2026-08-10 via ad-hoc synthetic WhatsApp export samples (iOS + Android formats, multi-line message merging, system-message filtering, idempotent re-run) in a scratch directory — passed, but the samples and results were not committed, so this isn't repeatable or regression-checked. Formalize as a `pytest` suite with committed fixture exports before relying on this script for a real audit at scale. |
+| DEBT-2 | `/find`'s bot defense is a honeypot field + DB-backed rate limit only, no real bot-detection product | ⬜ Not started | Sufficient for V1 (verified working, TESTS.md 2026-08-10) but a determined scripted attacker could still slow-drip submissions under the rate limit. Vercel BotID (GA) is a stronger option if spam becomes a real problem post-launch — not installed now to avoid adding a dependency before there's evidence it's needed. |
+
+---
+
+## Regression Watch List
+
+Full detail lives in [TESTS.md](./TESTS.md) under "Regression Suite" — this is just a pointer so it's discoverable from either document. The short list: tenant isolation, file-upload abuse handling, webhook signature verification, one-follow-up-max, stop-on-response, human-takeover kill switch, no-answer-outside-approved-knowledge, escalation timers. Any regression in these is release-blocking regardless of phase.
+
+---
+
+### Resolved
+
+- **DEP-6** — Supabase project provisioned. Resolved 2026-08-10: founder accepted Supabase's marketplace terms; `vercel integration add supabase --name capture-db` provisioned `capture-db` and connected it to the `capture` Vercel project, with env vars synced to Production, Preview, and Development alike (single shared project across environments for now — revisit separate dev/prod Supabase projects before real customer data is involved). `supabase/migrations/20260810000000_init.sql` and `supabase/seed_simulated.sql` applied successfully to the live project; confirmed via `pg_tables`/`pg_policies` that RLS is enabled with policies present on all 8 policy-bearing tables. Full tenant-isolation re-verification with real authenticated users is intentionally deferred to Phase 1.3 (when real Supabase Auth signup exists) rather than fabricating `auth.users` rows directly on the live project.
+- **DEP-5** — AI Gateway billing. Resolved 2026-08-10: founder added payment/credits to the Vercel AI Gateway. Verified directly: `anthropic/claude-haiku-4.5` now accessible (previously `RestrictedModelsError`), and 5 rapid sequential `generateText` calls all succeeded with no rate limiting (previously `GatewayRateLimitError` after ~2 calls). `classify.ts`'s default model updated from the free-tier `amazon/nova-lite` to `anthropic/claude-haiku-4.5`. This upgrade surfaced a real bug, now fixed: Claude's `reasoning` output regularly exceeded the schema's `.max(300)` character cap, correctly triggering `NoObjectGeneratedError` (structured-output validation doing its job) but at a rate that would have made classification silently fail often in production. Fixed by raising the cap to 600 chars and adding an explicit brevity instruction to the system prompt; retested against 2 realistic transcripts, both now pass.
+- **Magic-link login was silently broken for every real user** (found while building Phase 1.8's admin view, not previously caught since local-dev testing never exercised a real emailed link). Root cause: `/auth/confirm` was a server Route Handler that only reads query-string params, but Supabase's hosted `/auth/v1/verify` endpoint (what a real email link points to, with default email templates) redirects back with the session in the URL **hash fragment**, which never reaches the server. Confirmed via a real `generateLink()` + browser navigation that no session was established and `/admin` correctly bounced to `/login`. Fixed 2026-08-10: rewrote `/auth/confirm` as a client component handling both the hash-fragment flow (the actual default) and the query-param `token_hash` flow (in case email templates are ever customized). Retested end-to-end with a fresh real magic link post-fix — works. See TESTS.md for full detail.
+- **Founder's platform admin access provisioned.** 2026-08-10: created a Supabase Auth account for `probetsltd@gmail.com` via the Admin API (`createUser` — this never sends an email, it's silent account creation only) and granted `platform_admin`. No message was sent to the founder by this step; their next real `/login` magic-link attempt (which *will* send a real email) lands them in `/admin` with full access, now that the login bug above is fixed.
+- **`/upload` crashed on legitimately-sized-but-large files.** Found and fixed 2026-08-10 alongside the admin/CTA work: Next.js Server Actions default to a 1MB request body limit, lower than this app's own 5MB-per-file validation — so any file between 1MB and 5MB (a plausible size for a very active WhatsApp conversation) hit an unhandled framework-level crash instead of passing through to the app's own (working, tested) validation logic. Fixed by setting `experimental.serverActions.bodySizeLimit: "20mb"` in `next.config.ts`. Retested with a 5.86MB file post-fix — now correctly shows the app's own "file too large (max 5MB)" message.

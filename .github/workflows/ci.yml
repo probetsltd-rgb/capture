@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  pull_request:
+    paths:
+      - "web/**"
+      - ".github/workflows/ci.yml"
+  push:
+    branches: [main]
+    paths:
+      - "web/**"
+      - ".github/workflows/ci.yml"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "npm"
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Build
+        run: npm run build
+        env:
+          # Placeholder values so `next build` doesn't fail on missing env
+          # vars for routes that read them at build time. Real values live
+          # in Vercel; this build only validates the code compiles.
+          NEXT_PUBLIC_SUPABASE_URL: "https://placeholder.supabase.co"
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "placeholder"
+          NEXT_PUBLIC_SITE_URL: "http://localhost:3000"
+
+  # No `npm test` step yet — no test framework is installed because there's
+  # no application logic to unit test until Phase 1.4a/1.5 land. Add one
+  # (and a step here) when that code exists rather than scaffolding empty
+  # test infrastructure now. See PLANS.md Phase 1.1 / OUTSTANDINGS.md.

@@ -1,0 +1,30 @@
+# dependencies
+node_modules/
+web/node_modules/
+
+# next.js
+web/.next/
+web/out/
+
+# vercel
+.vercel/
+web/.vercel/
+
+# env files — never commit secrets
+.env
+.env.*
+!.env.example
+
+# typescript
+*.tsbuildinfo
+web/next-env.d.ts
+
+# misc
+.DS_Store
+*.pem
+npm-debug.log*
+
+# Phase 0 raw customer data — never commit real WhatsApp exports or the
+# customer_ref -> real identity mapping. See phase0/AUDIT_GUIDE.md "Data handling".
+phase0/**/_private/
+phase0/**/raw_exports/
