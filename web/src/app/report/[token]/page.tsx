@@ -148,6 +148,12 @@ export default async function ReportPage({
         <h2>Find what you&apos;re losing → recover what you can → prevent future leakage.</h2>
         <p>This report is the first step. What would help most right now?</p>
         <InterestForm token={token} />
+        <p style={{ marginTop: "1rem" }}>
+          <a href={`/signup?claim=${token}`}>Create your free account →</a>{" "}
+          <span style={{ color: "#888", fontSize: "0.85rem" }}>
+            track recovery progress and set up automated responses
+          </span>
+        </p>
       </section>
     </main>
   );

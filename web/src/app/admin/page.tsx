@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { computeNorthStar } from "@/lib/report/north-star";
 
 // Deliberately queries via the authenticated server client, NOT the
 // service-role client used elsewhere in this app for public/token-gated
@@ -35,10 +36,20 @@ export default async function AdminPage() {
   }
 
   const businessIds = businesses.map((b) => b.id);
-  const { data: conversations } = await supabase
-    .from("conversations")
-    .select("business_id, classified_at")
-    .in("business_id", businessIds);
+  // North Star (PRD §45) is a real-revenue metric — simulated fixtures
+  // (OUTSTANDINGS.md DEV-1) are excluded so a founder can't mistake fixture
+  // data for real influenced revenue.
+  const realBusinessIds = businesses.filter((b) => !b.is_simulated).map((b) => b.id);
+  const [{ data: conversations }, { data: allOpportunities }, { count: allMessagesCount }] = await Promise.all([
+    supabase.from("conversations").select("business_id, classified_at").in("business_id", businessIds),
+    realBusinessIds.length
+      ? supabase.from("opportunities").select("status, actual_revenue").in("business_id", realBusinessIds)
+      : Promise.resolve({ data: [] as { status: string; actual_revenue: number | null }[] }),
+    realBusinessIds.length
+      ? supabase.from("messages").select("id", { count: "exact", head: true }).in("business_id", realBusinessIds)
+      : Promise.resolve({ count: 0 }),
+  ]);
+  const northStar = computeNorthStar(allMessagesCount ?? 0, allOpportunities ?? []);
 
   const conversationCounts = new Map<string, { total: number; classified: number }>();
   for (const c of conversations ?? []) {
@@ -94,6 +105,39 @@ export default async function AdminPage() {
               <td style={{ padding: "0.25rem 1rem 0.25rem 0" }}>Audit → product interest</td>
               <td>
                 {interestedCount} / {totalAudits} ({pct(interestedCount, totalAudits)})
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section style={{ margin: "2rem 0" }}>
+        <h2>North Star — Incremental Revenue Influenced by Capture</h2>
+        <p style={{ fontSize: "0.85rem", color: "#666" }}>
+          PRD §45. Real (non-simulated) businesses only. Messages handled → opportunities identified →
+          opportunities recovered → revenue recovered → revenue protected/generated (Prevent leg not tracked in
+          V1).
+        </p>
+        <table style={{ borderCollapse: "collapse" }}>
+          <tbody>
+            <tr>
+              <td style={{ padding: "0.25rem 1rem 0.25rem 0" }}>Messages handled</td>
+              <td>{northStar.messagesHandled}</td>
+            </tr>
+            <tr>
+              <td style={{ padding: "0.25rem 1rem 0.25rem 0" }}>Opportunities identified</td>
+              <td>{northStar.opportunitiesIdentified}</td>
+            </tr>
+            <tr>
+              <td style={{ padding: "0.25rem 1rem 0.25rem 0" }}>Opportunities recovered</td>
+              <td>{northStar.opportunitiesRecovered}</td>
+            </tr>
+            <tr>
+              <td style={{ padding: "0.25rem 1rem 0.25rem 0", fontWeight: 700 }}>
+                Incremental revenue influenced
+              </td>
+              <td style={{ fontWeight: 700 }}>
+                ₦{Math.round(northStar.incrementalRevenueInfluenced).toLocaleString("en-NG")}
               </td>
             </tr>
           </tbody>

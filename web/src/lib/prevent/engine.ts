@@ -1,7 +1,7 @@
 import "server-only";
 import { generateObject, NoObjectGeneratedError } from "ai";
 import { engineResponseSchema, type EngineResponse } from "./schema";
-import { detectExplicitHumanRequest } from "./deterministic-triggers";
+import { detectExplicitHumanRequest, detectBusinessEscalationKeyword } from "./deterministic-triggers";
 
 const MODEL = process.env.PREVENT_MODEL || "anthropic/claude-haiku-4.5";
 
@@ -39,6 +39,7 @@ Approved knowledge for this business:
 export async function processInboundMessage(
   message: string,
   knowledgeItems: KnowledgeItemForEngine[],
+  extraEscalationKeywords: string[] = [],
 ): Promise<EngineResponse | null> {
   // Deterministic pass first (PRD §42) — cheap, reliable, and catches the
   // clearest cases without waiting on a model call.
@@ -49,6 +50,20 @@ export async function processInboundMessage(
       response: null,
       escalate: true,
       escalation_reason: "explicit request for a human",
+      qualification: { name: null, product_or_service: null, location: null, relevant_date: null, contact_details: null },
+    };
+  }
+
+  // Phase 4 "Configure Rules": business-supplied additional escalation
+  // triggers, checked with the same deterministic-first discipline.
+  const matchedKeyword = detectBusinessEscalationKeyword(message, extraEscalationKeywords);
+  if (matchedKeyword) {
+    return {
+      intent: "human_assistance",
+      can_answer_from_knowledge: false,
+      response: null,
+      escalate: true,
+      escalation_reason: `business-configured escalation keyword: "${matchedKeyword}"`,
       qualification: { name: null, product_or_service: null, location: null, relevant_date: null, contact_details: null },
     };
   }

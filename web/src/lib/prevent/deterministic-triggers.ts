@@ -16,3 +16,16 @@ const HUMAN_REQUEST_PATTERNS = [
 export function detectExplicitHumanRequest(message: string): boolean {
   return HUMAN_REQUEST_PATTERNS.some((pattern) => pattern.test(message));
 }
+
+/**
+ * Business-supplied additions (businesses.escalation_keywords, Phase 4
+ * "Configure Rules") — plain substrings, matched case-insensitively. Kept
+ * distinct from detectExplicitHumanRequest so the engine can report an
+ * accurate escalation_reason rather than always claiming "asked for a
+ * human" when what actually fired was e.g. a business's own "fraud" trigger.
+ */
+export function detectBusinessEscalationKeyword(message: string, extraKeywords: string[]): string | null {
+  if (extraKeywords.length === 0) return null;
+  const lower = message.toLowerCase();
+  return extraKeywords.find((kw) => kw.trim() && lower.includes(kw.trim().toLowerCase())) ?? null;
+}

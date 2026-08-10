@@ -83,13 +83,17 @@ export async function startCampaign(businessId: string): Promise<ActionResult> {
 export async function markContacted(opportunityId: string, businessId: string): Promise<ActionResult> {
   const supabase = await createClient();
 
-  const { data: existing } = await supabase
-    .from("automations")
-    .select("id")
-    .eq("opportunity_id", opportunityId)
-    .in("status", ["sent", "responded", "completed"]);
+  const [{ data: existing }, { data: business }] = await Promise.all([
+    supabase
+      .from("automations")
+      .select("id")
+      .eq("opportunity_id", opportunityId)
+      .in("status", ["sent", "responded", "completed"]),
+    supabase.from("businesses").select("max_recover_followups").eq("id", businessId).maybeSingle(),
+  ]);
 
-  if (!canLogAnotherContact(existing?.length ?? 0)) {
+  const maxFollowups = business?.max_recover_followups ?? undefined;
+  if (!canLogAnotherContact(existing?.length ?? 0, maxFollowups)) {
     return { ok: false, message: "Follow-up limit reached for this opportunity — do not contact again (PRD §12)." };
   }
 

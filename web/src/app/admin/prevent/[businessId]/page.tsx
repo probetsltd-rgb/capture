@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { computePreventSummary } from "@/lib/prevent/summary";
 import { SimulateForm } from "./SimulateForm";
 import { ConversationRow } from "./ConversationRow";
 
@@ -32,16 +33,13 @@ export default async function PreventPage({
   const customerNameById = new Map((customers ?? []).map((c) => [c.id, c.name]));
 
   const convs = conversations ?? [];
-  const enquiriesReceived = convs.length;
   const conversationIds = convs.map((c) => c.id);
   const { data: aiMessages } = conversationIds.length
     ? await supabase.from("messages").select("conversation_id").eq("sender_type", "ai").in("conversation_id", conversationIds)
     : { data: [] };
   const answeredConversationIds = new Set((aiMessages ?? []).map((m) => m.conversation_id));
-  const enquiriesAnswered = answeredConversationIds.size;
-  const humanHandoffs = convs.filter((c) => c.escalated_at !== null).length;
-  const qualifiedLeads = convs.filter((c) => c.qualification && Object.keys(c.qualification).length > 0).length;
-  const followUpsSent = convs.reduce((sum, c) => sum + (c.ai_followup_count ?? 0), 0);
+  const { enquiriesReceived, enquiriesAnswered, qualifiedLeads, humanHandoffs, followUpsSent } =
+    computePreventSummary(convs, answeredConversationIds);
 
   return (
     <main style={{ maxWidth: 900, margin: "3rem auto", fontFamily: "sans-serif" }}>

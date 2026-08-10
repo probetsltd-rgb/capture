@@ -212,17 +212,19 @@ No code in this phase. Methodology and working templates: [phase0/AUDIT_GUIDE.md
 
 **Goal (PRD §43):** Reduce human implementation effort while preserving quality.
 
+> ⚠️ **Process deviation (2026-08-11), `DEV-4`:** PRD §43 frames Phase 4 as coming "after real deployments" — none exist yet (Phase 0/1 real-pilot items are still open, see `DEV-1`/`DEP-8`). Built ahead of that per explicit founder instruction (confirmed via `AskUserQuestion` before starting: "Full Phase 4 as scoped in PLANS.md"). Everything below is real, tested code against real (test) accounts and the live Supabase project — what's *not* real yet is a genuine external self-serve signup, since none has happened outside of my own test accounts (all deleted after testing, see `TESTS.md`). See `OUTSTANDINGS.md` `DEV-4` for the billing-scope interpretation.
+
 ### Build
-- [ ] Standardised onboarding across Find/Recover/Prevent
-- [ ] Self-service signup (billing/plan limits layered onto the multi-tenant foundation already in place)
-- [ ] Deployment automation (reduce Assisted-tier manual work)
-- [ ] Reusable per-vertical configuration templates
-- [ ] Reporting toward the North Star metric — Incremental Revenue Influenced by Capture (PRD §45)
+- [x] Standardised onboarding across Find/Recover/Prevent — `/onboarding`, one entry point for both a fresh self-serve signup and a Find-originated business claiming its account (`web/src/app/onboarding/`), rather than separate flows per product. Business Info (name/industry) + Configure Rules + knowledge-base pre-population all happen in this one step. Verified end-to-end for both paths (TESTS.md 2026-08-11).
+- [x] Self-service signup — `/signup` (magic link, reuses `/login`'s existing `requestMagicLink` — see that action's comment: any email could already authenticate, nothing ever turned that into real business access until now) + `/onboarding` creates the `business_members` grant via a server-verified session, never trusting client-supplied identity. "Billing/plan limits" scoped as *product enrollment tracking* (`recover_activated_at`/`prevent_activated_at`, self-serve "Activate" toggles), not payment processing — see `OUTSTANDINGS.md` `DEV-4` for why, and the pinned V1 Non-Goals reminder above. Claim flow (existing Find business → real account) verified secure: wrong-email rejected, correct-email succeeds, already-claimed rejected (TESTS.md 2026-08-11).
+- [x] Deployment automation (reduce Assisted-tier manual work) — self-serve equivalents of PRD §27-28's steps that don't require a live channel: Business Info + Configure Rules (`/dashboard/settings`: business-configurable `max_ai_followups`/`max_recover_followups`/`escalation_keywords`, overriding the previously-hardcoded constants) + Test (existing simulate-inbound harness, now reachable by the business owner directly, not just the founder) + Approve/Activate (`ActivateButton`, Prevent activation requires ≥1 knowledge item). "Connect" stays blocked on `DEP-1`/`DEP-2`/`DEP-4` — unchanged from Phase 3.
+- [x] Reusable per-vertical configuration templates — `vertical_templates` table, seeded for 3 verticals (`real_estate`, `automotive`, `hospitality`), keyed by the same `industry` values Find already collects (PLANS.md deliberately did not introduce a second "vertical" concept). Applied automatically at onboarding via one code path (`applyVerticalTemplate()`) regardless of entry point. Verified reused across 2 different verticals with zero custom code — `real_estate` and `automotive` templates each correctly populated distinct knowledge items and escalation keywords for two different test businesses (TESTS.md 2026-08-11), satisfying the gate test below.
+- [x] Reporting toward the North Star metric (PRD §45) — `web/src/lib/report/north-star.ts`, surfaced on both the self-serve `/dashboard` (per-business) and `/admin` (platform-wide, real businesses only — `SIMULATED —` fixtures excluded). Honest about what's not measurable yet: `revenueProtected` (Prevent's leg) is always `null`, never a fabricated number, and `incrementalRevenueInfluenced` is documented as only the Recover leg for now.
 
 ### Phase 4 Gate Tests
-- [ ] N self-service signups completed with zero founder intervention
-- [ ] A configuration template reused across ≥2 different verticals without custom code
-- [ ] Regression: full suite from Phases 1–3 still passes
+- [ ] N self-service signups completed with zero founder intervention — the *mechanism* is real and tested (TESTS.md 2026-08-11), but every signup exercised so far was a test account created and deleted by me, not an actual external business. Still open pending real usage, same shape as `DEV-1`.
+- [x] A configuration template reused across ≥2 different verticals without custom code — verified: `real_estate` and `automotive` templates applied via the identical `applyVerticalTemplate()` path for two different test businesses, each correctly getting their own distinct knowledge items/keywords (TESTS.md 2026-08-11).
+- [ ] Regression: full suite from Phases 1–3 still passes — tenant isolation re-verified for real this session (TESTS.md 2026-08-11); the rest of Phases 1-3's gate tests were not formally re-run (no schema/RLS changes to their tables beyond additive columns), consistent with how Phase 3's own gate section treats this same caveat.
 
 ---
 

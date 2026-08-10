@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { computeRecoverSummary } from "@/lib/recover/summary";
 import { StartCampaignButton } from "./StartCampaignButton";
 import { CampaignActions } from "./CampaignActions";
 
@@ -52,12 +53,8 @@ export default async function RecoverCampaignPage({
   );
 
   const opps = opportunities ?? [];
-  const identified = opps.length;
-  const contacted = opps.filter((o) => o.status !== "identified").length;
-  const responded = opps.filter((o) => ["responded", "won", "lost", "not_sure"].includes(o.status)).length;
-  const recovered = opps.filter((o) => o.status === "won").length;
-  const revenueRecovered = opps.reduce((sum, o) => sum + (o.actual_revenue ?? 0), 0);
-  const hasEligible = opps.some((o) => o.status === "identified");
+  const { identified, contacted, responded, recovered, revenueRecovered, hasEligible } =
+    computeRecoverSummary(opps);
 
   return (
     <main style={{ maxWidth: 900, margin: "3rem auto", fontFamily: "sans-serif" }}>

@@ -78,10 +78,16 @@ export function computePriorityScore(
 
 // PRD §12: "One further follow-up where appropriate → Stop." First contact
 // + at most one follow-up = 2 total automation attempts per opportunity.
+// Businesses can lower (never silently raise past what's sane) this via
+// businesses.max_recover_followups — Phase 4 "Configure Rules" — see
+// admin/recover/[businessId]/actions.ts's markContacted for the override lookup.
 export const MAX_AUTOMATIONS_PER_OPPORTUNITY = 2;
 
-export function canLogAnotherContact(existingAutomationCount: number): boolean {
-  return existingAutomationCount < MAX_AUTOMATIONS_PER_OPPORTUNITY;
+export function canLogAnotherContact(
+  existingAutomationCount: number,
+  max: number = MAX_AUTOMATIONS_PER_OPPORTUNITY,
+): boolean {
+  return existingAutomationCount < max;
 }
 
 // PRD §32/§12: the moment a customer responds, automation stops — no

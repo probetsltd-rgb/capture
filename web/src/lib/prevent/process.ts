@@ -62,14 +62,15 @@ export async function handleInboundMessage(
     return { status: "suppressed_human_active" };
   }
 
-  const { data: knowledge } = await supabase
-    .from("knowledge_items")
-    .select("category, question, content")
-    .eq("business_id", businessId);
+  const [{ data: knowledge }, { data: business }] = await Promise.all([
+    supabase.from("knowledge_items").select("category, question, content").eq("business_id", businessId),
+    supabase.from("businesses").select("escalation_keywords").eq("id", businessId).maybeSingle(),
+  ]);
+  const extraEscalationKeywords = (business?.escalation_keywords as string[] | null) ?? [];
 
   await supabase.from("conversations").update({ state: "ai_handling" }).eq("id", conversationId);
 
-  const result = await processInboundMessage(messageBody, knowledge ?? []);
+  const result = await processInboundMessage(messageBody, knowledge ?? [], extraEscalationKeywords);
 
   // Re-check immediately before committing — this is the actual kill
   // switch, not the pre-check above (which only prevents starting new work
