@@ -17,11 +17,11 @@ export function ApproveButton({ businessId, itemId }: { businessId: string; item
             setError(result.ok ? null : result.message);
           })
         }
-        style={{ fontSize: "0.8rem" }}
+        
       >
         {pending ? "Approving…" : "Approve"}
       </button>
-      {error && <span style={{ color: "crimson", fontSize: "0.8rem" }}> {error}</span>}
+      {error && <span className="meta" style={{ color: "#8c2f2f" }}> {error}</span>}
     </>
   );
 }

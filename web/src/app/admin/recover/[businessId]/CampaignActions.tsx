@@ -26,7 +26,7 @@ export function CampaignActions({
   }
 
   if (status === "won" || status === "lost" || status === "not_sure") {
-    return <span style={{ color: "#888" }}>{status}</span>;
+    return <span className="meta">{status}</span>;
   }
 
   return (
@@ -37,7 +37,7 @@ export function CampaignActions({
         </button>
       )}
       {status === "identified" && !hasPendingAutomation && (
-        <span style={{ color: "#888" }}>Not yet queued — start a campaign</span>
+        <span className="meta">Not yet queued — start a campaign</span>
       )}
       {status === "contacted" && (
         <>
@@ -56,7 +56,7 @@ export function CampaignActions({
             placeholder="Revenue if won"
             value={revenue}
             onChange={(e) => setRevenue(e.target.value)}
-            style={{ width: "100px" }}
+            className="input" style={{ width: "120px" }}
           />
           <div style={{ display: "flex", gap: "0.25rem" }}>
             <button
@@ -77,7 +77,7 @@ export function CampaignActions({
           </div>
         </>
       )}
-      {message && <span style={{ color: "#888" }}>{message}</span>}
+      {message && <span className="meta">{message}</span>}
     </div>
   );
 }

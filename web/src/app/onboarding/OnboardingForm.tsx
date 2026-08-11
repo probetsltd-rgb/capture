@@ -21,24 +21,24 @@ export function OnboardingForm() {
 
   return (
     <form action={formAction}>
-      <label style={{ display: "block", marginBottom: "1rem" }}>
+      <label className="field">
         Business name
         <input
           type="text"
           name="business_name"
           required
           maxLength={200}
-          style={{ display: "block", width: "100%", padding: "0.5rem", marginTop: "0.25rem" }}
+          className="input"
         />
       </label>
 
-      <label style={{ display: "block", marginBottom: "1rem" }}>
+      <label className="field">
         Industry
         <select
           name="industry"
           required
           defaultValue=""
-          style={{ display: "block", width: "100%", padding: "0.5rem", marginTop: "0.25rem" }}
+          className="input"
         >
           <option value="" disabled>
             Select one
@@ -51,17 +51,17 @@ export function OnboardingForm() {
         </select>
       </label>
 
-      <label style={{ display: "block", marginBottom: "1rem" }}>
+      <label className="field">
         Average transaction value (₦, optional)
         <input
           type="number"
           name="avg_transaction_value"
           min={0}
-          style={{ display: "block", width: "100%", padding: "0.5rem", marginTop: "0.25rem" }}
+          className="input"
         />
       </label>
 
-      <label style={{ display: "block", marginBottom: "1rem", fontSize: "0.9rem" }}>
+      <label className="checkbox">
         <input type="checkbox" name="consent" /> I agree to Capture processing my business&apos;s customer
         conversations to identify and recover revenue leakage, as described in the{" "}
         <a href="/privacy" target="_blank" rel="noopener noreferrer">
@@ -70,8 +70,8 @@ export function OnboardingForm() {
         .
       </label>
 
-      {!state.ok && state.message && <p style={{ color: "crimson" }}>{state.message}</p>}
-      <button type="submit" disabled={pending} style={{ padding: "0.6rem 1.2rem" }}>
+      {!state.ok && state.message && <p className="notice notice--error">{state.message}</p>}
+      <button type="submit" disabled={pending} className="btn btn--primary">
         {pending ? "Creating…" : "Create my workspace"}
       </button>
     </form>

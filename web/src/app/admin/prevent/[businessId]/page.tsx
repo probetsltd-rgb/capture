@@ -15,7 +15,7 @@ export default async function PreventPage({
   const { data: business } = await supabase.from("businesses").select("id, name").eq("id", businessId).maybeSingle();
   if (!business) {
     return (
-      <main style={{ maxWidth: 480, margin: "4rem auto", fontFamily: "sans-serif" }}>
+      <main className="shell app-page">
         <h1>Not found</h1>
         <p>No business visible with this ID.</p>
       </main>
@@ -42,47 +42,47 @@ export default async function PreventPage({
     computePreventSummary(convs, answeredConversationIds);
 
   return (
-    <main style={{ maxWidth: 900, margin: "3rem auto", fontFamily: "sans-serif" }}>
+    <main className="shell app-page">
       <p>
         <Link href="/admin">← Back to admin</Link> · <Link href={`/admin/prevent/${businessId}/knowledge`}>Manage approved knowledge →</Link>
       </p>
       <h1>Prevent — {business.name}</h1>
 
-      <section style={{ margin: "1.5rem 0" }}>
+      <section >
         <h2>Dashboard</h2>
-        <table style={{ borderCollapse: "collapse" }}>
+        <table className="table">
           <tbody>
             <tr>
-              <td style={{ padding: "0.25rem 1rem 0.25rem 0" }}>Enquiries received</td>
+              <td >Enquiries received</td>
               <td>{enquiriesReceived}</td>
             </tr>
             <tr>
-              <td style={{ padding: "0.25rem 1rem 0.25rem 0" }}>Enquiries answered</td>
+              <td >Enquiries answered</td>
               <td>{enquiriesAnswered}</td>
             </tr>
             <tr>
-              <td style={{ padding: "0.25rem 1rem 0.25rem 0" }}>Qualified leads</td>
+              <td >Qualified leads</td>
               <td>{qualifiedLeads}</td>
             </tr>
             <tr>
-              <td style={{ padding: "0.25rem 1rem 0.25rem 0" }}>Human handoffs</td>
+              <td >Human handoffs</td>
               <td>{humanHandoffs}</td>
             </tr>
             <tr>
-              <td style={{ padding: "0.25rem 1rem 0.25rem 0" }}>Follow-ups sent</td>
+              <td >Follow-ups sent</td>
               <td>{followUpsSent}</td>
             </tr>
             <tr>
-              <td style={{ padding: "0.25rem 1rem 0.25rem 0" }}>Conversions/revenue</td>
-              <td style={{ color: "#888" }}>Not tracked in V1 — see PLANS.md</td>
+              <td >Conversions/revenue</td>
+              <td className="meta">Not tracked in V1 — see PLANS.md</td>
             </tr>
           </tbody>
         </table>
       </section>
 
-      <section style={{ margin: "1.5rem 0" }}>
+      <section >
         <h2>Simulate an inbound message</h2>
-        <p style={{ fontSize: "0.85rem", color: "#888" }}>
+        <p className="meta">
           Stand-in for a live WhatsApp/Instagram connection, which isn&apos;t available yet.
         </p>
         <SimulateForm businessId={businessId} />
@@ -90,20 +90,20 @@ export default async function PreventPage({
 
       <section>
         <h2>Conversations</h2>
-        <table style={{ borderCollapse: "collapse", width: "100%", fontSize: "0.9rem" }}>
+        <table className="table">
           <thead>
-            <tr style={{ textAlign: "left", borderBottom: "1px solid #333" }}>
-              <th style={{ padding: "0.4rem" }}>Customer</th>
-              <th style={{ padding: "0.4rem" }}>State</th>
-              <th style={{ padding: "0.4rem" }}>Action</th>
+            <tr >
+              <th >Customer</th>
+              <th >State</th>
+              <th >Action</th>
             </tr>
           </thead>
           <tbody>
             {convs.map((c) => (
-              <tr key={c.id} style={{ borderBottom: "1px solid #222" }}>
-                <td style={{ padding: "0.4rem" }}>{customerNameById.get(c.customer_id) ?? "—"}</td>
-                <td style={{ padding: "0.4rem" }}>{c.state}</td>
-                <td style={{ padding: "0.4rem" }}>
+              <tr key={c.id} >
+                <td >{customerNameById.get(c.customer_id) ?? "—"}</td>
+                <td >{c.state}</td>
+                <td >
                   <ConversationRow
                     businessId={businessId}
                     conversationId={c.id}
@@ -116,7 +116,7 @@ export default async function PreventPage({
             ))}
             {convs.length === 0 && (
               <tr>
-                <td colSpan={3} style={{ padding: "0.4rem", color: "#888" }}>
+                <td colSpan={3} className="meta">
                   No conversations yet — simulate one above.
                 </td>
               </tr>

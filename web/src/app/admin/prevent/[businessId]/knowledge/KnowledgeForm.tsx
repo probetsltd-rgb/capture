@@ -27,7 +27,7 @@ export function KnowledgeForm({ businessId }: { businessId: string }) {
       </select>
       <input type="text" name="question" placeholder="Question this answers (optional, for FAQs)" />
       <textarea name="content" required placeholder="Approved content — exactly what the AI is allowed to say" rows={3} />
-      {!state.ok && state.message && <p style={{ color: "crimson" }}>{state.message}</p>}
+      {!state.ok && state.message && <p className="notice notice--error">{state.message}</p>}
       <button type="submit" disabled={pending}>
         {pending ? "Saving…" : "Add knowledge item"}
       </button>

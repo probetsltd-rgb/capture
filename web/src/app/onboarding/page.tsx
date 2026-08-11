@@ -40,7 +40,7 @@ export default async function OnboardingPage({
 
     if (!business) {
       return (
-        <main style={{ maxWidth: 480, margin: "4rem auto", fontFamily: "sans-serif" }}>
+        <main className="shell app-page">
           <h1>Claim link invalid</h1>
           <p>This link doesn&apos;t match a business we know about.</p>
         </main>
@@ -48,7 +48,7 @@ export default async function OnboardingPage({
     }
 
     return (
-      <main style={{ maxWidth: 480, margin: "4rem auto", fontFamily: "sans-serif" }}>
+      <main className="shell app-page">
         <h1>Claim your account</h1>
         <p>
           Link <strong>{business.name}</strong> to {claims.claims.email as string}?
@@ -59,7 +59,7 @@ export default async function OnboardingPage({
   }
 
   return (
-    <main style={{ maxWidth: 480, margin: "4rem auto", fontFamily: "sans-serif" }}>
+    <main className="shell app-page">
       <h1>Set up your business</h1>
       <p>A few details, then we&apos;ll get your Recover/Prevent workspace ready.</p>
       <OnboardingForm />

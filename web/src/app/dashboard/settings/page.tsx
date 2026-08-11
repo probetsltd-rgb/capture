@@ -23,7 +23,7 @@ export default async function DashboardSettingsPage() {
   if (!business) redirect("/onboarding");
 
   return (
-    <main style={{ maxWidth: 560, margin: "3rem auto", fontFamily: "sans-serif" }}>
+    <main className="shell app-page">
       <p>
         <Link href="/dashboard">← Back to dashboard</Link>
       </p>

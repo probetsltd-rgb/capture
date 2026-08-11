@@ -20,7 +20,7 @@ export function StartCampaignButton({ businessId }: { businessId: string }) {
       >
         {pending ? "Queuing…" : "Start recovery campaign"}
       </button>
-      {message && <p style={{ color: "#888", fontSize: "0.9rem" }}>{message}</p>}
+      {message && <p className="meta">{message}</p>}
     </div>
   );
 }

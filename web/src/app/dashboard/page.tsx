@@ -81,13 +81,13 @@ export default async function DashboardPage() {
   const hasFindData = (findConversations?.length ?? 0) > 0;
 
   return (
-    <main style={{ maxWidth: 900, margin: "3rem auto", fontFamily: "sans-serif" }}>
+    <main className="shell app-page">
       <h1>{business.name}</h1>
-      <p style={{ color: "#888" }}>
+      <p className="meta">
         {business.industry ?? "No industry set"} · <Link href="/dashboard/settings">Configure rules →</Link>
       </p>
 
-      <section style={{ margin: "1.5rem 0" }}>
+      <section >
         <h2>Find</h2>
         {hasFindData ? (
           <p>
@@ -101,21 +101,21 @@ export default async function DashboardPage() {
         )}
       </section>
 
-      <section style={{ margin: "1.5rem 0" }}>
+      <section >
         <h2>Recover {business.recover_activated_at ? "· Active" : "· Not activated"}</h2>
-        <table style={{ borderCollapse: "collapse" }}>
+        <table className="table">
           <tbody>
             <tr>
-              <td style={{ padding: "0.25rem 1rem 0.25rem 0" }}>Opportunities identified</td>
+              <td >Opportunities identified</td>
               <td>{recover.identified}</td>
             </tr>
             <tr>
-              <td style={{ padding: "0.25rem 1rem 0.25rem 0" }}>Contacted</td>
+              <td >Contacted</td>
               <td>{recover.contacted}</td>
             </tr>
             <tr>
-              <td style={{ padding: "0.25rem 1rem 0.25rem 0", fontWeight: 700 }}>Revenue recovered</td>
-              <td style={{ fontWeight: 700 }}>{formatNaira(recover.revenueRecovered)}</td>
+              <td >Revenue recovered</td>
+              <td >{formatNaira(recover.revenueRecovered)}</td>
             </tr>
           </tbody>
         </table>
@@ -125,24 +125,24 @@ export default async function DashboardPage() {
         {!business.recover_activated_at && <ActivateButton businessId={businessId} product="recover" />}
       </section>
 
-      <section style={{ margin: "1.5rem 0" }}>
+      <section >
         <h2>Prevent {business.prevent_activated_at ? "· Active" : "· Not activated"}</h2>
-        <table style={{ borderCollapse: "collapse" }}>
+        <table className="table">
           <tbody>
             <tr>
-              <td style={{ padding: "0.25rem 1rem 0.25rem 0" }}>Enquiries received</td>
+              <td >Enquiries received</td>
               <td>{prevent.enquiriesReceived}</td>
             </tr>
             <tr>
-              <td style={{ padding: "0.25rem 1rem 0.25rem 0" }}>Enquiries answered</td>
+              <td >Enquiries answered</td>
               <td>{prevent.enquiriesAnswered}</td>
             </tr>
             <tr>
-              <td style={{ padding: "0.25rem 1rem 0.25rem 0" }}>Human handoffs</td>
+              <td >Human handoffs</td>
               <td>{prevent.humanHandoffs}</td>
             </tr>
             <tr>
-              <td style={{ padding: "0.25rem 1rem 0.25rem 0" }}>Approved knowledge items</td>
+              <td >Approved knowledge items</td>
               <td>{knowledgeCount ?? 0}</td>
             </tr>
           </tbody>
@@ -154,35 +154,35 @@ export default async function DashboardPage() {
         {!business.prevent_activated_at && <ActivateButton businessId={businessId} product="prevent" />}
       </section>
 
-      <section style={{ margin: "1.5rem 0", paddingTop: "1.5rem", borderTop: "1px solid #333" }}>
+      <section style={{ paddingTop: "var(--s6)", borderTop: "1px solid var(--rule)" }}>
         <h2>Incremental Revenue Influenced by Capture</h2>
-        <p style={{ fontSize: "0.85rem", color: "#666" }}>
+        <p className="meta">
           Messages handled → opportunities identified → opportunities recovered → revenue recovered → revenue
           protected/generated. Only the Recover leg is measurable today.
         </p>
-        <table style={{ borderCollapse: "collapse" }}>
+        <table className="table">
           <tbody>
             <tr>
-              <td style={{ padding: "0.25rem 1rem 0.25rem 0" }}>Messages handled</td>
+              <td >Messages handled</td>
               <td>{northStar.messagesHandled}</td>
             </tr>
             <tr>
-              <td style={{ padding: "0.25rem 1rem 0.25rem 0" }}>Opportunities identified</td>
+              <td >Opportunities identified</td>
               <td>{northStar.opportunitiesIdentified}</td>
             </tr>
             <tr>
-              <td style={{ padding: "0.25rem 1rem 0.25rem 0" }}>Opportunities recovered</td>
+              <td >Opportunities recovered</td>
               <td>{northStar.opportunitiesRecovered}</td>
             </tr>
             <tr>
-              <td style={{ padding: "0.25rem 1rem 0.25rem 0" }}>Revenue protected/generated (Prevent)</td>
-              <td style={{ color: "#888" }}>Not tracked in V1</td>
+              <td >Revenue protected/generated (Prevent)</td>
+              <td className="meta">Not tracked in V1</td>
             </tr>
             <tr>
-              <td style={{ padding: "0.25rem 1rem 0.25rem 0", fontWeight: 700 }}>
+              <td >
                 Incremental revenue influenced
               </td>
-              <td style={{ fontWeight: 700 }}>{formatNaira(northStar.incrementalRevenueInfluenced)}</td>
+              <td >{formatNaira(northStar.incrementalRevenueInfluenced)}</td>
             </tr>
           </tbody>
         </table>

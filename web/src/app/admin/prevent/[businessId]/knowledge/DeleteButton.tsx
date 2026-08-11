@@ -13,7 +13,7 @@ export function DeleteButton({ businessId, itemId }: { businessId: string; itemI
           await deleteKnowledgeItem(businessId, itemId);
         })
       }
-      style={{ fontSize: "0.8rem" }}
+      
     >
       Delete
     </button>

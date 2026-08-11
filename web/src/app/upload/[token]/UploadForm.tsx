@@ -12,47 +12,46 @@ export function UploadForm({ token }: { token: string }) {
 
   if (state.status === "success") {
     return (
-      <div>
-        <p>{state.message}</p>
-        <p>
-          <Link
-            href={`/report/${token}`}
-            style={{
-              display: "inline-block",
-              padding: "0.6rem 1.2rem",
-              background: "#111",
-              color: "#fff",
-              textDecoration: "none",
-              borderRadius: "4px",
-            }}
-          >
-            View my Revenue Leak Report
-          </Link>
-        </p>
-        <p style={{ fontSize: "0.85rem", color: "#666" }}>
-          Analysis runs in the background — refresh the report page in a moment if it looks incomplete.
+      <div className="stack">
+        <p className="notice notice--ok">{state.message}</p>
+        <Link href={`/report/${token}`} className="btn btn--primary">
+          View my Revenue Leak Report
+        </Link>
+        <p className="meta">
+          Analysis runs in the background — refresh the report in a moment if it looks incomplete.
         </p>
       </div>
     );
   }
 
   return (
-    <form action={formAction}>
-      <label style={{ display: "block", marginBottom: "1rem" }}>
-        <span>Approximate average transaction value (₦, optional)</span>
+    <form action={formAction} className="form">
+      <label className="field">
+        <span className="field__label">
+          Average transaction value<span className="field__hint"> · Optional</span>
+        </span>
         <input
           type="number"
           name="avg_transaction_value"
           min="0"
           step="1"
           placeholder="e.g. 150000"
-          style={{ display: "block", width: "100%", padding: "0.5rem", marginTop: "0.25rem" }}
+          className="input"
         />
-        <small>Used to estimate the value of missed opportunities in your report — not shown to anyone else.</small>
+        <span className="field__hint">
+          Used to estimate what missed opportunities are worth. Only you see it.
+        </span>
       </label>
-      <input type="file" name="files" accept=".txt" multiple required style={{ display: "block", margin: "1rem 0" }} />
-      {state.status === "error" && <p style={{ color: "crimson" }}>{state.message}</p>}
-      <button type="submit" disabled={pending} style={{ padding: "0.6rem 1.2rem" }}>
+
+      <label className="field">
+        <span className="field__label">Conversation exports</span>
+        <input type="file" name="files" accept=".txt" multiple required className="input" style={{ height: "auto", paddingBlock: "10px" }} />
+        <span className="field__hint">.txt files only, up to 5MB each.</span>
+      </label>
+
+      {state.status === "error" && <p className="notice notice--error">{state.message}</p>}
+
+      <button type="submit" disabled={pending} className="btn btn--primary btn--block">
         {pending ? "Uploading…" : "Upload conversations"}
       </button>
     </form>

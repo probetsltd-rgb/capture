@@ -13,7 +13,7 @@ export function ClaimButton({ token }: { token: string }) {
     <div style={{ margin: "1rem 0" }}>
       <button
         disabled={pending}
-        style={{ padding: "0.6rem 1.2rem" }}
+        className="btn btn--primary"
         onClick={() =>
           startTransition(async () => {
             const result = await claimBusiness(token);
@@ -27,7 +27,7 @@ export function ClaimButton({ token }: { token: string }) {
       >
         {pending ? "Linking…" : "Claim this business"}
       </button>
-      {message && <p style={{ color: "crimson" }}>{message}</p>}
+      {message && <p className="notice notice--error">{message}</p>}
     </div>
   );
 }

@@ -23,7 +23,7 @@ export default async function AdminPage() {
 
   if (!businesses || businesses.length === 0) {
     return (
-      <main style={{ maxWidth: 480, margin: "4rem auto", fontFamily: "sans-serif" }}>
+      <main className="shell app-page">
         <h1>Capture — Admin</h1>
         <p>Signed in as {claims?.claims.email ?? "unknown"}.</p>
         <p>
@@ -79,38 +79,38 @@ export default async function AdminPage() {
   const pct = (n: number, d: number) => (d === 0 ? "—" : `${Math.round((100 * n) / d)}%`);
 
   return (
-    <main style={{ maxWidth: 900, margin: "3rem auto", fontFamily: "sans-serif" }}>
+    <main className="shell app-page">
       <h1>Capture — Admin</h1>
       <p>Signed in as {claims?.claims.email ?? "unknown"}.</p>
 
       <section style={{ margin: "2rem 0" }}>
         <h2>Find funnel</h2>
-        <table style={{ borderCollapse: "collapse" }}>
+        <table className="table">
           <tbody>
             <tr>
-              <td style={{ padding: "0.25rem 1rem 0.25rem 0" }}>Audits started (intake completed)</td>
+              <td >Audits started (intake completed)</td>
               <td>{totalAudits}</td>
             </tr>
             <tr>
-              <td style={{ padding: "0.25rem 1rem 0.25rem 0" }}>Upload completion</td>
+              <td >Upload completion</td>
               <td>
                 {uploadedCount} / {totalAudits} ({pct(uploadedCount, totalAudits)})
               </td>
             </tr>
             <tr>
-              <td style={{ padding: "0.25rem 1rem 0.25rem 0" }}>Analysis completion (conversations classified)</td>
+              <td >Analysis completion (conversations classified)</td>
               <td>
                 {totalClassified} / {totalConversations} ({pct(totalClassified, totalConversations)})
               </td>
             </tr>
             <tr>
-              <td style={{ padding: "0.25rem 1rem 0.25rem 0" }}>Report engagement</td>
+              <td >Report engagement</td>
               <td>
                 {reportViewedCount} / {totalAudits} ({pct(reportViewedCount, totalAudits)})
               </td>
             </tr>
             <tr>
-              <td style={{ padding: "0.25rem 1rem 0.25rem 0" }}>Audit → product interest</td>
+              <td >Audit → product interest</td>
               <td>
                 {interestedCount} / {totalAudits} ({pct(interestedCount, totalAudits)})
               </td>
@@ -121,30 +121,30 @@ export default async function AdminPage() {
 
       <section style={{ margin: "2rem 0" }}>
         <h2>North Star — Incremental Revenue Influenced by Capture</h2>
-        <p style={{ fontSize: "0.85rem", color: "#666" }}>
+        <p className="meta">
           PRD §45. Real (non-simulated) businesses only. Messages handled → opportunities identified →
           opportunities recovered → revenue recovered → revenue protected/generated (Prevent leg not tracked in
           V1).
         </p>
-        <table style={{ borderCollapse: "collapse" }}>
+        <table className="table">
           <tbody>
             <tr>
-              <td style={{ padding: "0.25rem 1rem 0.25rem 0" }}>Messages handled</td>
+              <td >Messages handled</td>
               <td>{northStar.messagesHandled}</td>
             </tr>
             <tr>
-              <td style={{ padding: "0.25rem 1rem 0.25rem 0" }}>Opportunities identified</td>
+              <td >Opportunities identified</td>
               <td>{northStar.opportunitiesIdentified}</td>
             </tr>
             <tr>
-              <td style={{ padding: "0.25rem 1rem 0.25rem 0" }}>Opportunities recovered</td>
+              <td >Opportunities recovered</td>
               <td>{northStar.opportunitiesRecovered}</td>
             </tr>
             <tr>
-              <td style={{ padding: "0.25rem 1rem 0.25rem 0", fontWeight: 700 }}>
+              <td >
                 Incremental revenue influenced
               </td>
-              <td style={{ fontWeight: 700 }}>
+              <td >
                 ₦{Math.round(northStar.incrementalRevenueInfluenced).toLocaleString("en-NG")}
               </td>
             </tr>
@@ -154,17 +154,17 @@ export default async function AdminPage() {
 
       <section>
         <h2>Businesses</h2>
-        <table style={{ borderCollapse: "collapse", width: "100%", fontSize: "0.9rem" }}>
+        <table className="table">
           <thead>
-            <tr style={{ textAlign: "left", borderBottom: "1px solid #333" }}>
-              <th style={{ padding: "0.4rem" }}>Business</th>
-              <th style={{ padding: "0.4rem" }}>Industry</th>
-              <th style={{ padding: "0.4rem" }}>Created</th>
-              <th style={{ padding: "0.4rem" }}>Conversations</th>
-              <th style={{ padding: "0.4rem" }}>Classified</th>
-              <th style={{ padding: "0.4rem" }}>Report viewed</th>
-              <th style={{ padding: "0.4rem" }}>Interest</th>
-              <th style={{ padding: "0.4rem" }}></th>
+            <tr >
+              <th >Business</th>
+              <th >Industry</th>
+              <th >Created</th>
+              <th >Conversations</th>
+              <th >Classified</th>
+              <th >Report viewed</th>
+              <th >Interest</th>
+              <th ></th>
             </tr>
           </thead>
           <tbody>
@@ -174,18 +174,18 @@ export default async function AdminPage() {
                 .filter(Boolean)
                 .join(", ");
               return (
-                <tr key={b.id} style={{ borderBottom: "1px solid #222" }}>
-                  <td style={{ padding: "0.4rem" }}>
+                <tr key={b.id} >
+                  <td >
                     {b.name}
-                    {b.is_simulated && <span style={{ color: "#888" }}> (simulated)</span>}
+                    {b.is_simulated && <span className="meta"> (simulated)</span>}
                   </td>
-                  <td style={{ padding: "0.4rem" }}>{b.industry ?? "—"}</td>
-                  <td style={{ padding: "0.4rem" }}>{new Date(b.created_at).toLocaleDateString()}</td>
-                  <td style={{ padding: "0.4rem" }}>{counts.total}</td>
-                  <td style={{ padding: "0.4rem" }}>{counts.classified}</td>
-                  <td style={{ padding: "0.4rem" }}>{b.report_viewed_at ? "Yes" : "No"}</td>
-                  <td style={{ padding: "0.4rem" }}>{interests || "—"}</td>
-                  <td style={{ padding: "0.4rem" }}>
+                  <td >{b.industry ?? "—"}</td>
+                  <td >{new Date(b.created_at).toLocaleDateString()}</td>
+                  <td >{counts.total}</td>
+                  <td >{counts.classified}</td>
+                  <td >{b.report_viewed_at ? "Yes" : "No"}</td>
+                  <td >{interests || "—"}</td>
+                  <td >
                     <Link href={`/admin/recover/${b.id}`}>Recover →</Link>{" "}
                     <Link href={`/admin/prevent/${b.id}`}>Prevent →</Link>
                   </td>

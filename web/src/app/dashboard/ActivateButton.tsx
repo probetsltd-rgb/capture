@@ -11,7 +11,7 @@ export function ActivateButton({ businessId, product }: { businessId: string; pr
     <div style={{ margin: "0.5rem 0" }}>
       <button
         disabled={pending}
-        style={{ padding: "0.5rem 1rem" }}
+        className="btn btn--primary"
         onClick={() =>
           startTransition(async () => {
             const result = await activateProduct(businessId, product);
@@ -21,7 +21,7 @@ export function ActivateButton({ businessId, product }: { businessId: string; pr
       >
         {pending ? "Activating…" : `Activate ${product === "recover" ? "Recover" : "Prevent"}`}
       </button>
-      {message && <p style={{ color: "#888", fontSize: "0.85rem" }}>{message}</p>}
+      {message && <p className="meta">{message}</p>}
     </div>
   );
 }

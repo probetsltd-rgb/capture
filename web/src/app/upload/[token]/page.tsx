@@ -1,4 +1,5 @@
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { SiteNav, SiteFooter } from "@/components/SiteChrome";
 import { UploadForm } from "./UploadForm";
 
 export default async function UploadPage({
@@ -16,24 +17,40 @@ export default async function UploadPage({
 
   if (!business) {
     return (
-      <main style={{ maxWidth: 480, margin: "4rem auto", fontFamily: "sans-serif" }}>
-        <h1>Link not found</h1>
-        <p>This upload link is invalid or has expired. Please contact us to get a new one.</p>
-      </main>
+      <div className="page">
+        <SiteNav />
+        <main>
+          <div className="shell center-page">
+            <h1 className="h2">Link not found</h1>
+            <p className="body" style={{ marginTop: "var(--s4)" }}>
+              This upload link is invalid or has expired. Please contact us to get a new one.
+            </p>
+          </div>
+        </main>
+        <SiteFooter />
+      </div>
     );
   }
 
   return (
-    <main style={{ maxWidth: 480, margin: "3rem auto", fontFamily: "sans-serif" }}>
-      <h1>Upload your conversations</h1>
-      <p>
-        Uploading for <strong>{business.name}</strong>.
-      </p>
-      <p>
-        Export 20–50 representative WhatsApp conversations (Settings → individual chat → Export
-        Chat → <strong>Without Media</strong>) and upload the resulting .txt files here.
-      </p>
-      <UploadForm token={token} />
-    </main>
+    <div className="page">
+      <SiteNav />
+      <main>
+        <div className="shell center-page">
+          <h1 className="h2">Upload your conversations</h1>
+          <p className="body" style={{ marginTop: "var(--s3)" }}>
+            Uploading for <strong style={{ color: "var(--ink)" }}>{business.name}</strong>.
+          </p>
+          <p className="meta" style={{ marginTop: "var(--s5)" }}>
+            Export 20–50 representative WhatsApp conversations — in WhatsApp, open a chat →
+            Export Chat → <strong>Without Media</strong> — and upload the resulting .txt files.
+          </p>
+          <div style={{ marginTop: "var(--s6)" }}>
+            <UploadForm token={token} />
+          </div>
+        </div>
+      </main>
+      <SiteFooter />
+    </div>
   );
 }

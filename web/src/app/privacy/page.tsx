@@ -1,15 +1,12 @@
+import { SiteNav, SiteFooter } from "@/components/SiteChrome";
+
 export default function PrivacyPage() {
   return (
-    <main style={{ maxWidth: 640, margin: "3rem auto", fontFamily: "sans-serif", lineHeight: 1.6 }}>
-      <div
-        style={{
-          background: "#fff8e1",
-          border: "1px solid #e0c46c",
-          padding: "0.75rem 1rem",
-          marginBottom: "2rem",
-          fontSize: "0.9rem",
-        }}
-      >
+    <div className="page">
+      <SiteNav />
+      <main>
+        <div className="shell band prose">
+      <div className="notice" style={{ marginBottom: "var(--s6)" }}>
         <strong>Draft, not final legal terms.</strong> This page describes, in plain language,
         how Capture currently handles data during the free Revenue Leak Audit. It is not yet a
         reviewed privacy policy or terms of service — those are pending legal review before
@@ -17,7 +14,7 @@ export default function PrivacyPage() {
         directly before submitting the form.
       </div>
 
-      <h1>Privacy &amp; Data Handling</h1>
+      <h1 className="h2">Privacy &amp; Data Handling</h1>
 
       <h2>What we collect at this step</h2>
       <p>
@@ -53,6 +50,9 @@ export default function PrivacyPage() {
         You can ask us to delete your data at any time. Contact us using the email you submitted
         the form with.
       </p>
-    </main>
+        </div>
+      </main>
+      <SiteFooter />
+    </div>
   );
 }

@@ -10,23 +10,31 @@ export function InterestForm({ token }: { token: string }) {
   const [state, formAction, pending] = useActionState(action, initialState);
 
   if (state.status === "success") {
-    return <p>{state.message}</p>;
+    return <p className="notice notice--ok">{state.message}</p>;
   }
 
   return (
-    <form action={formAction}>
-      <label style={{ display: "block", marginBottom: "0.5rem" }}>
-        <input type="checkbox" name="recover" /> Recover — help us re-engage these dormant
-        opportunities
+    <form action={formAction} className="form">
+      <label className="checkbox">
+        <input type="checkbox" name="recover" />
+        <span>
+          <strong style={{ color: "var(--ink)", fontWeight: 500 }}>Recover</strong> — work through
+          the opportunities in this report.
+        </span>
       </label>
-      <label style={{ display: "block", marginBottom: "0.5rem" }}>
-        <input type="checkbox" name="prevent" /> Prevent — stop new enquiries from going cold
-        going forward
+      <label className="checkbox">
+        <input type="checkbox" name="prevent" />
+        <span>
+          <strong style={{ color: "var(--ink)", fontWeight: 500 }}>Prevent</strong> — stop new
+          enquiries going cold from here on.
+        </span>
       </label>
-      {state.status === "error" && <p style={{ color: "crimson" }}>{state.message}</p>}
-      <button type="submit" disabled={pending} style={{ padding: "0.6rem 1.2rem", marginTop: "0.5rem" }}>
-        {pending ? "Sending…" : "I'm interested"}
-      </button>
+      {state.status === "error" && <p className="notice notice--error">{state.message}</p>}
+      <div>
+        <button type="submit" disabled={pending} className="btn btn--primary">
+          {pending ? "Sending…" : "I'm interested"}
+        </button>
+      </div>
     </form>
   );
 }

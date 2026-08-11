@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import Link from "next/link";
+import { SiteNav, SiteFooter } from "@/components/SiteChrome";
 import { submitIntake, type IntakeState } from "./actions";
 import {
   INDUSTRIES,
@@ -16,135 +17,192 @@ export default function FindPage() {
 
   if (state.status === "success") {
     return (
-      <main style={{ maxWidth: 480, margin: "4rem auto", fontFamily: "sans-serif" }}>
-        <h1>You&apos;re in.</h1>
-        <p>{state.message}</p>
-        {state.uploadUrl && (
-          <p>
-            <Link
-              href={state.uploadUrl}
-              style={{
-                display: "inline-block",
-                padding: "0.6rem 1.2rem",
-                background: "#111",
-                color: "#fff",
-                textDecoration: "none",
-                borderRadius: "4px",
-              }}
-            >
-              Upload my conversations now
+      <div className="page">
+        <SiteNav />
+        <main>
+          <div className="shell center-page stack--lg" style={{ display: "grid" }}>
+            <div>
+              <h1 className="h2">You&apos;re in.</h1>
+              <p className="body" style={{ marginTop: "var(--s4)" }}>
+                {state.message}
+              </p>
+            </div>
+            {state.uploadUrl && (
+              <Link href={state.uploadUrl} className="btn btn--primary">
+                Upload my conversations
+              </Link>
+            )}
+            <Link href="/" className="btn btn--ghost">
+              ← Back to home
             </Link>
-          </p>
-        )}
-        <p>
-          <Link href="/">Back to home</Link>
-        </p>
-      </main>
+          </div>
+        </main>
+        <SiteFooter />
+      </div>
     );
   }
 
   return (
-    <main style={{ maxWidth: 480, margin: "3rem auto", fontFamily: "sans-serif" }}>
-      <h1>Find My Revenue Leaks</h1>
-      <p>
-        Free. Takes about a minute. We&apos;ll follow up to collect a sample of your WhatsApp
-        conversations and show you where enquiries are going unanswered or cold.
-      </p>
+    <div className="page">
+      <SiteNav />
 
-      <form action={formAction}>
-        {/* Honeypot — hidden from real users via CSS, not `type="hidden"`
-            (some bots skip those), never sent a value by a human. */}
-        <div style={{ position: "absolute", left: "-9999px" }} aria-hidden="true">
-          <label htmlFor="website_url">Leave this field blank</label>
-          <input type="text" id="website_url" name="website_url" tabIndex={-1} autoComplete="off" />
+      <main>
+        <div className="shell band">
+          <div className="intake">
+            <div className="intake__aside">
+              <h1 className="h2">Find My Revenue Leaks</h1>
+              <p className="body" style={{ marginTop: "var(--s4)" }}>
+                Free, and it takes about a minute. Next we&apos;ll collect a sample of your
+                WhatsApp conversations and send back a priced report showing where enquiries went
+                unanswered or cold.
+              </p>
+
+              <ol className="flow" style={{ marginTop: "var(--s6)" }}>
+                <li className="flow__step">
+                  <span className="flow__marker" aria-hidden="true">
+                    <span className="flow__dot" />
+                  </span>
+                  <span>
+                    <span className="flow__label">Tell us about your business</span>
+                    <span className="flow__note" style={{ display: "block" }}>
+                      About a minute
+                    </span>
+                  </span>
+                </li>
+                <li className="flow__step">
+                  <span className="flow__marker" aria-hidden="true">
+                    <span className="flow__dot" />
+                  </span>
+                  <span>
+                    <span className="flow__label">Upload a conversation export</span>
+                    <span className="flow__note" style={{ display: "block" }}>
+                      Exported from WhatsApp, no integration needed
+                    </span>
+                  </span>
+                </li>
+                <li className="flow__step flow__step--realised">
+                  <span className="flow__marker" aria-hidden="true">
+                    <span className="flow__dot" />
+                  </span>
+                  <span>
+                    <span className="flow__label">Get your Revenue Leak Report</span>
+                    <span className="flow__note" style={{ display: "block" }}>
+                      Counts, examples and an opportunity value
+                    </span>
+                  </span>
+                </li>
+              </ol>
+            </div>
+
+            <div className="intake__form">
+              <form action={formAction} className="form">
+                {/* Honeypot — hidden from real users via CSS, not `type="hidden"`
+                    (some bots skip those), never sent a value by a human. */}
+                <div style={{ position: "absolute", left: "-9999px" }} aria-hidden="true">
+                  <label htmlFor="website_url">Leave this field blank</label>
+                  <input type="text" id="website_url" name="website_url" tabIndex={-1} autoComplete="off" />
+                </div>
+
+                <Field label="Business name">
+                  <input type="text" name="business_name" required maxLength={200} className="input" />
+                </Field>
+
+                <Field label="Industry">
+                  <select name="industry" required defaultValue="" className="input">
+                    <option value="" disabled>
+                      Select one
+                    </option>
+                    {INDUSTRIES.map((i) => (
+                      <option key={i.value} value={i.value}>
+                        {i.label}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+
+                <Field label="Website or Instagram" hint="Optional">
+                  <input type="text" name="website_or_instagram" className="input" />
+                </Field>
+
+                <Field label="Approximate annual revenue">
+                  <select name="revenue_bucket" required defaultValue="" className="input">
+                    <option value="" disabled>
+                      Select one
+                    </option>
+                    {REVENUE_BUCKETS.map((b) => (
+                      <option key={b.value} value={b.value}>
+                        {b.label}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+
+                <Field label="Approximate monthly WhatsApp conversations">
+                  <select name="volume_bucket" required defaultValue="" className="input">
+                    <option value="" disabled>
+                      Select one
+                    </option>
+                    {CONVERSATION_VOLUME_BUCKETS.map((b) => (
+                      <option key={b.value} value={b.value}>
+                        {b.label}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+
+                <Field label="Contact email">
+                  <input type="email" name="contact_email" required className="input" />
+                </Field>
+
+                <Field label="WhatsApp number" hint="Optional">
+                  <input type="tel" name="contact_phone" className="input" />
+                </Field>
+
+                <label className="checkbox">
+                  <input type="checkbox" name="consent" required />
+                  <span>
+                    I agree to Capture&apos;s{" "}
+                    <Link href="/privacy" className="link">
+                      Privacy &amp; Data Handling
+                    </Link>{" "}
+                    terms, including analysis of the WhatsApp conversations I&apos;ll provide for
+                    this audit.
+                  </span>
+                </label>
+
+                {state.status === "error" && (
+                  <p className="notice notice--error">{state.message}</p>
+                )}
+
+                <button type="submit" disabled={pending} className="btn btn--primary btn--block">
+                  {pending ? "Submitting…" : "Get my Revenue Leak Report"}
+                </button>
+              </form>
+            </div>
+          </div>
         </div>
+      </main>
 
-        <Field label="Business name">
-          <input type="text" name="business_name" required maxLength={200} style={inputStyle} />
-        </Field>
-
-        <Field label="Industry">
-          <select name="industry" required defaultValue="" style={inputStyle}>
-            <option value="" disabled>
-              Select one
-            </option>
-            {INDUSTRIES.map((i) => (
-              <option key={i.value} value={i.value}>
-                {i.label}
-              </option>
-            ))}
-          </select>
-        </Field>
-
-        <Field label="Website or Instagram (optional)">
-          <input type="text" name="website_or_instagram" style={inputStyle} />
-        </Field>
-
-        <Field label="Approximate annual revenue">
-          <select name="revenue_bucket" required defaultValue="" style={inputStyle}>
-            <option value="" disabled>
-              Select one
-            </option>
-            {REVENUE_BUCKETS.map((b) => (
-              <option key={b.value} value={b.value}>
-                {b.label}
-              </option>
-            ))}
-          </select>
-        </Field>
-
-        <Field label="Approximate monthly WhatsApp conversations">
-          <select name="volume_bucket" required defaultValue="" style={inputStyle}>
-            <option value="" disabled>
-              Select one
-            </option>
-            {CONVERSATION_VOLUME_BUCKETS.map((b) => (
-              <option key={b.value} value={b.value}>
-                {b.label}
-              </option>
-            ))}
-          </select>
-        </Field>
-
-        <Field label="Contact email">
-          <input type="email" name="contact_email" required style={inputStyle} />
-        </Field>
-
-        <Field label="WhatsApp number (optional)">
-          <input type="tel" name="contact_phone" style={inputStyle} />
-        </Field>
-
-        <label style={{ display: "flex", gap: "0.5rem", margin: "1rem 0", fontSize: "0.9rem" }}>
-          <input type="checkbox" name="consent" required />
-          <span>
-            I agree to Capture&apos;s{" "}
-            <Link href="/privacy">Privacy &amp; Data Handling</Link> terms, including analysis of
-            the WhatsApp conversations I&apos;ll provide for this audit.
-          </span>
-        </label>
-
-        {state.status === "error" && (
-          <p style={{ color: "crimson" }}>{state.message}</p>
-        )}
-
-        <button type="submit" disabled={pending} style={{ padding: "0.6rem 1.2rem" }}>
-          {pending ? "Submitting…" : "Get my Revenue Leak Report"}
-        </button>
-      </form>
-    </main>
+      <SiteFooter />
+    </div>
   );
 }
 
-const inputStyle: React.CSSProperties = {
-  width: "100%",
-  padding: "0.5rem",
-  marginTop: "0.25rem",
-};
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  children: React.ReactNode;
+}) {
   return (
-    <label style={{ display: "block", marginBottom: "1rem" }}>
-      <span>{label}</span>
+    <label className="field">
+      <span className="field__label">
+        {label}
+        {hint && <span className="field__hint"> · {hint}</span>}
+      </span>
       {children}
     </label>
   );

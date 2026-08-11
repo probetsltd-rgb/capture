@@ -19,7 +19,7 @@ export function SimulateForm({ businessId }: { businessId: string }) {
       <button type="submit" disabled={pending}>
         {pending ? "Processing…" : "Simulate inbound message"}
       </button>
-      {state.message && <p style={{ color: "#888" }}>{state.message}</p>}
+      {state.message && <p className="meta">{state.message}</p>}
     </form>
   );
 }

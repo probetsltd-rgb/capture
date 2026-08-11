@@ -21,10 +21,10 @@ export function ConversationRow({
   const [message, setMessage] = useState<string | null>(null);
 
   if (state === "human_handling") {
-    return <span style={{ color: "#888" }}>Taken by {assignedTo}</span>;
+    return <span className="meta">Taken by {assignedTo}</span>;
   }
   if (state === "closed") {
-    return <span style={{ color: "#888" }}>Closed</span>;
+    return <span className="meta">Closed</span>;
   }
 
   return (
@@ -61,7 +61,7 @@ export function ConversationRow({
           Close
         </button>
       </div>
-      {message && <span style={{ fontSize: "0.8rem", color: "#888" }}>{message}</span>}
+      {message && <span className="meta">{message}</span>}
     </div>
   );
 }

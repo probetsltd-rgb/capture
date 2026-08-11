@@ -1,7 +1,9 @@
 "use client";
 
 import { Suspense, useActionState } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { SiteNav, SiteFooter } from "@/components/SiteChrome";
 import { requestMagicLink } from "./actions";
 
 const initialState = { error: null as string | null, sent: false };
@@ -12,38 +14,57 @@ function LoginForm() {
   const [state, formAction, pending] = useActionState(requestMagicLink, initialState);
 
   return (
-    <main style={{ maxWidth: 360, margin: "4rem auto", fontFamily: "sans-serif" }}>
-      <h1>Capture — Sign in</h1>
-      <p>Enter your email for a magic sign-in link.</p>
+    <div className="shell center-page">
+      <h1 className="h2">Sign in</h1>
+      <p className="body" style={{ marginTop: "var(--s3)" }}>
+        We&apos;ll email you a link. No password to remember.
+      </p>
+
       {state.sent ? (
-        <p>Check your email for a sign-in link.</p>
+        <p className="notice notice--ok" style={{ marginTop: "var(--s6)" }}>
+          Check your email for a sign-in link.
+        </p>
       ) : (
-        <form action={formAction}>
+        <form action={formAction} className="form" style={{ marginTop: "var(--s6)" }}>
           <input type="hidden" name="next" value={next} />
-          <input
-            type="email"
-            name="email"
-            required
-            placeholder="you@example.com"
-            style={{ width: "100%", padding: "0.5rem", marginBottom: "0.5rem" }}
-          />
-          <button type="submit" disabled={pending} style={{ padding: "0.5rem 1rem" }}>
+          <label className="field">
+            <span className="field__label">Email address</span>
+            <input
+              type="email"
+              name="email"
+              required
+              autoComplete="email"
+              placeholder="you@company.com"
+              className="input"
+            />
+          </label>
+          {state.error && <p className="notice notice--error">{state.error}</p>}
+          <button type="submit" disabled={pending} className="btn btn--primary btn--block">
             {pending ? "Sending…" : "Send magic link"}
           </button>
         </form>
       )}
-      {state.error && <p style={{ color: "crimson" }}>{state.error}</p>}
-      <p style={{ marginTop: "2rem", fontSize: "0.85rem" }}>
-        New to Capture? <a href="/signup">Create an account</a>
+
+      <p className="meta" style={{ marginTop: "var(--s6)" }}>
+        New to Capture?{" "}
+        <Link href="/signup" className="link">
+          Create an account
+        </Link>
       </p>
-    </main>
+    </div>
   );
 }
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={null}>
-      <LoginForm />
-    </Suspense>
+    <div className="page">
+      <SiteNav />
+      <main>
+        <Suspense fallback={null}>
+          <LoginForm />
+        </Suspense>
+      </main>
+      <SiteFooter />
+    </div>
   );
 }

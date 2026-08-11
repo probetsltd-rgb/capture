@@ -25,7 +25,7 @@ export function RulesForm({
 
   return (
     <form action={formAction}>
-      <label style={{ display: "block", marginBottom: "1rem" }}>
+      <label className="field">
         Max Recover follow-up contacts
         <input
           type="number"
@@ -33,31 +33,31 @@ export function RulesForm({
           min={0}
           max={platformMaxRecoverFollowups}
           defaultValue={maxRecoverFollowups ?? ""}
-          style={{ display: "block", width: "100%", padding: "0.5rem", marginTop: "0.25rem" }}
+          className="input"
         />
-        <span style={{ fontSize: "0.8rem", color: "#666" }}>
+        <span className="field__hint">
           Blank uses the platform default ({platformMaxRecoverFollowups}). You can lower this, but not raise it —
           the cap is a promise to your customers, not a preference.
         </span>
       </label>
 
-      <label style={{ display: "block", marginBottom: "1rem" }}>
+      <label className="field">
         Extra escalation keywords (comma-separated)
         <input
           type="text"
           name="escalation_keywords"
           defaultValue={escalationKeywords.join(", ")}
           placeholder="e.g. fraud, refund, allergy"
-          style={{ display: "block", width: "100%", padding: "0.5rem", marginTop: "0.25rem" }}
+          className="input"
         />
-        <span style={{ fontSize: "0.8rem", color: "#666" }}>
+        <span className="field__hint">
           Any message containing one of these goes straight to a human, before the AI sees it. Minimum 3 characters
           each. Clearing this field removes all extra keywords.
         </span>
       </label>
 
-      {state.message && <p style={{ color: state.ok ? "#888" : "crimson" }}>{state.message}</p>}
-      <button type="submit" disabled={pending} style={{ padding: "0.6rem 1.2rem" }}>
+      {state.message && <p className={state.ok ? "notice notice--ok" : "notice notice--error"}>{state.message}</p>}
+      <button type="submit" disabled={pending} className="btn btn--primary">
         {pending ? "Saving…" : "Save"}
       </button>
     </form>
