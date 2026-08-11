@@ -24,6 +24,9 @@ export default function Home() {
         >
           Find My Revenue Leaks — Free
         </Link>
+        <p style={{ marginTop: "0.75rem", fontSize: "0.85rem" }}>
+          Already have an account? <Link href="/login">Sign in</Link>
+        </p>
       </section>
 
       <section style={{ marginBottom: "3rem" }}>
@@ -40,21 +43,32 @@ export default function Home() {
         <div>
           <h3>Find</h3>
           <p>See where revenue opportunities are falling through the cracks.</p>
+          <p style={{ color: "#888", fontSize: "0.8rem", fontWeight: 600 }}>Free, self-serve</p>
         </div>
         <div>
           <h3>Recover</h3>
           <p>Recover dormant leads, customers, and opportunities.</p>
+          <p style={{ color: "#888", fontSize: "0.8rem", fontWeight: 600 }}>
+            Available now — Capture finds and scores the opportunities, you handle the outreach.{" "}
+            <Link href="/signup">Set up Recover →</Link>
+          </p>
         </div>
         <div>
           <h3>Prevent</h3>
           <p>Stop new enquiries from going cold.</p>
+          <p style={{ color: "#888", fontSize: "0.8rem", fontWeight: 600 }}>
+            Live automated responses are coming, pending WhatsApp/Instagram access — you can set
+            up your knowledge base now. <Link href="/signup">Set up Prevent →</Link>
+          </p>
         </div>
       </section>
 
       <section style={{ marginTop: "3rem", textAlign: "center", color: "#666", fontSize: "0.9rem" }}>
         <p>
-          Currently available: the free Revenue Leak Audit (Find). Recover and Prevent are on the
-          way.
+          Find is free and fully self-serve. Recover is available today as a guided workflow — no
+          messaging automation yet, so you send the actual outreach yourself. Prevent&apos;s
+          knowledge base and rules can be configured now; it can&apos;t yet respond to real
+          customers until a WhatsApp/Instagram connection is live.
         </p>
       </section>
     </main>
