@@ -3,7 +3,26 @@
 import { useActionState, useRef, useState } from "react";
 import Link from "next/link";
 import { submitUpload, type UploadState } from "./actions";
-import { unzipJsonFiles, ZipParseError } from "@/lib/instagram/unzip";
+import { unzipJsonFiles, ZipParseError, type UnzipDiagnostics } from "@/lib/instagram/unzip";
+
+// Turns "found nothing" into an answer rather than a dead end. The most
+// likely real-world cause: Instagram's export tool has a Format dropdown
+// (JSON vs HTML) as well as the Content selector — a business owner who
+// exported in HTML format gets a structurally identical-looking .zip that
+// legitimately contains zero .json files, and the generic error gave no way
+// to tell that apart from something actually being wrong with the archive.
+function describeEmptyZip(zipName: string, diagnostics: UnzipDiagnostics): string {
+  const htmlCount = diagnostics.extensionCounts[".html"] ?? 0;
+  if (htmlCount > 0) {
+    return `${zipName} contains ${htmlCount} .html file(s) but no .json — this looks like it was exported in HTML format. Go back to Instagram's export tool and choose "JSON" under Format, then re-download.`;
+  }
+  const breakdown = Object.entries(diagnostics.extensionCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([ext, count]) => `${count} ${ext}`)
+    .join(", ");
+  return `${zipName} doesn't contain any .json files (found ${diagnostics.totalEntries} file(s): ${breakdown || "none"}) — is this the right export? Make sure "Messages" is selected under Content and "JSON" under Format.`;
+}
 
 const initialState: UploadState = { status: "idle", message: null };
 
@@ -44,9 +63,9 @@ export function UploadForm({ token }: { token: string }) {
 
       for (const zipFile of zipFiles) {
         const bytes = new Uint8Array(await zipFile.arrayBuffer());
-        const jsonFiles = await unzipJsonFiles(bytes);
+        const { files: jsonFiles, diagnostics } = await unzipJsonFiles(bytes);
         if (jsonFiles.length === 0) {
-          throw new ZipParseError(`${zipFile.name} didn't contain any .json files — is this the right export?`);
+          throw new ZipParseError(describeEmptyZip(zipFile.name, diagnostics));
         }
         for (const { name, text } of jsonFiles) {
           extracted.push(new File([text], name, { type: "application/json" }));

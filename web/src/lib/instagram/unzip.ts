@@ -23,6 +23,7 @@ const MAX_SINGLE_FILE_BYTES = 20 * 1024 * 1024; // generous for a JSON conversat
 const MAX_TOTAL_BYTES = 200 * 1024 * 1024; // aggregate ceiling across the whole archive
 
 export type UnzippedTextFile = { name: string; text: string };
+export type UnzipDiagnostics = { totalEntries: number; extensionCounts: Record<string, number> };
 
 export class ZipParseError extends Error {}
 
@@ -60,8 +61,18 @@ async function inflateRaw(compressed: Uint8Array<ArrayBuffer>): Promise<Uint8Arr
  * entries) are skipped by name before any decompression is attempted, not
  * discarded after — a "Messages only" export should mean there are few of
  * these, but nothing here assumes that.
+ *
+ * Also returns a count of every extension actually present in the archive
+ * (not just .json), even when nothing is extracted — the single most useful
+ * fact for diagnosing a real-world "found nothing" case (e.g. the export
+ * was generated in HTML format instead of JSON, which produces a
+ * structurally identical-looking zip that legitimately contains zero .json
+ * files) without needing the file's actual content, which callers
+ * shouldn't need to inspect or forward anywhere just to explain an error.
  */
-export async function unzipJsonFiles(zipBytes: Uint8Array): Promise<UnzippedTextFile[]> {
+export async function unzipJsonFiles(
+  zipBytes: Uint8Array,
+): Promise<{ files: UnzippedTextFile[]; diagnostics: UnzipDiagnostics }> {
   const view = new DataView(zipBytes.buffer, zipBytes.byteOffset, zipBytes.byteLength);
   const eocdOffset = findEndOfCentralDirectory(zipBytes, view);
 
@@ -82,6 +93,7 @@ export async function unzipJsonFiles(zipBytes: Uint8Array): Promise<UnzippedText
 
   const decoder = new TextDecoder("utf-8");
   const results: UnzippedTextFile[] = [];
+  const extensionCounts: Record<string, number> = {};
   let totalBytesExtracted = 0;
 
   let pos = centralDirOffset;
@@ -108,6 +120,12 @@ export async function unzipJsonFiles(zipBytes: Uint8Array): Promise<UnzippedText
     // Always advance past the full record, whether or not this entry is
     // one we keep — later entries' correctness depends on it.
     pos += 46 + nameLength + extraLength + commentLength;
+
+    if (!name.endsWith("/")) {
+      const dot = name.lastIndexOf(".");
+      const ext = dot === -1 ? "(no extension)" : name.slice(dot).toLowerCase();
+      extensionCounts[ext] = (extensionCounts[ext] ?? 0) + 1;
+    }
 
     if (!name.toLowerCase().endsWith(".json") || name.endsWith("/")) continue;
 
@@ -161,5 +179,5 @@ export async function unzipJsonFiles(zipBytes: Uint8Array): Promise<UnzippedText
     results.push({ name: baseName, text: decoder.decode(fileBytes) });
   }
 
-  return results;
+  return { files: results, diagnostics: { totalEntries, extensionCounts } };
 }
