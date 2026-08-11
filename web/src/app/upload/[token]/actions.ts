@@ -4,8 +4,9 @@ import { headers } from "next/headers";
 import { after } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { checkRateLimit } from "@/lib/rate-limit";
-import { validateUploadBatch, looksLikeText } from "@/lib/file-validation";
-import { parseWhatsAppExport, guessBusinessSenderName } from "@/lib/whatsapp/parse";
+import { validateUploadBatch, looksLikeText, looksLikeInstagramExport } from "@/lib/file-validation";
+import { parseWhatsAppExport, guessBusinessSenderName, type ParsedConversation } from "@/lib/whatsapp/parse";
+import { groupInstagramExportFiles, parseInstagramConversation } from "@/lib/instagram/parse";
 import { classifyConversation } from "@/lib/classification/classify";
 
 export type UploadState = {
@@ -65,10 +66,23 @@ export async function submitUpload(
   // Parse everything first (in memory — raw files are never persisted, per
   // phase0/AUDIT_GUIDE.md's data-minimisation stance) before writing
   // anything, so a mid-batch failure doesn't leave a half-imported state.
-  const parsedByFile: { name: string; parsed: NonNullable<ReturnType<typeof parseWhatsAppExport>> }[] = [];
+  //
+  // Two channels, routed by extension (already validated above):
+  // - .txt -> WhatsApp, one file is one conversation, same as always.
+  // - .json -> Instagram. Every conversation folder's export file is
+  //   literally named message_1.json, so files are grouped into
+  //   conversations by their JSON content (title/participants), not by
+  //   filename — see groupInstagramExportFiles's own comment. A single
+  //   conversation can span multiple files (message_1.json, message_2.json…
+  //   for a long history), so this is a grouping pass before parsing, not a
+  //   1:1 file-to-conversation loop like the WhatsApp path.
+  const parsedByFile: { name: string; channel: "whatsapp" | "instagram"; parsed: ParsedConversation }[] = [];
   const skipped: string[] = [];
 
-  for (const file of files) {
+  const txtFiles = files.filter((f) => f.name.toLowerCase().endsWith(".txt"));
+  const jsonFiles = files.filter((f) => f.name.toLowerCase().endsWith(".json"));
+
+  for (const file of txtFiles) {
     const buffer = new Uint8Array(await file.arrayBuffer());
     if (!looksLikeText(buffer)) {
       skipped.push(`${file.name} (not plain text)`);
@@ -80,13 +94,42 @@ export async function submitUpload(
       skipped.push(`${file.name} (no messages found)`);
       continue;
     }
-    parsedByFile.push({ name: file.name, parsed });
+    parsedByFile.push({ name: file.name, channel: "whatsapp", parsed });
+  }
+
+  const jsonFileTexts: { name: string; text: string }[] = [];
+  for (const file of jsonFiles) {
+    const buffer = new Uint8Array(await file.arrayBuffer());
+    if (!looksLikeText(buffer)) {
+      skipped.push(`${file.name} (not plain text)`);
+      continue;
+    }
+    const text = new TextDecoder("utf-8").decode(buffer);
+    if (!looksLikeInstagramExport(text)) {
+      skipped.push(`${file.name} (not a recognised Instagram export file)`);
+      continue;
+    }
+    jsonFileTexts.push({ name: file.name, text });
+  }
+
+  if (jsonFileTexts.length > 0) {
+    const { groups, unparseable } = groupInstagramExportFiles(jsonFileTexts);
+    for (const name of unparseable) skipped.push(`${name} (not a recognised Instagram export file)`);
+
+    for (const [conversationKey, pages] of groups) {
+      const parsed = parseInstagramConversation(pages);
+      if (!parsed) {
+        skipped.push(`${conversationKey} (no messages found)`);
+        continue;
+      }
+      parsedByFile.push({ name: conversationKey, channel: "instagram", parsed });
+    }
   }
 
   if (parsedByFile.length === 0) {
     return {
       status: "error",
-      message: `None of the uploaded files could be read as WhatsApp exports. ${skipped.join("; ")}`,
+      message: `None of the uploaded files could be read as WhatsApp or Instagram exports. ${skipped.join("; ")}`,
     };
   }
 
@@ -99,7 +142,7 @@ export async function submitUpload(
     messages: { sender_type: string; body: string | null }[];
   }[] = [];
 
-  for (const { parsed } of parsedByFile) {
+  for (const { channel, parsed } of parsedByFile) {
     const otherSenders = new Set(
       parsed.messages.map((m) => m.sender).filter((s) => s !== businessSenderName),
     );
@@ -120,7 +163,7 @@ export async function submitUpload(
       .insert({
         business_id: business.id,
         customer_id: customer.id,
-        channel: "whatsapp",
+        channel,
         source: "manual_export",
         first_message_at: parsed.firstMessageAt.toISOString(),
         last_message_at: parsed.lastMessageAt.toISOString(),

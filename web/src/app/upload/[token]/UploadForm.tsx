@@ -45,8 +45,18 @@ export function UploadForm({ token }: { token: string }) {
 
       <label className="field">
         <span className="field__label">Conversation exports</span>
-        <input type="file" name="files" accept=".txt" multiple required className="input" style={{ height: "auto", paddingBlock: "10px" }} />
-        <span className="field__hint">.txt files only, up to 5MB each.</span>
+        <input
+          type="file"
+          name="files"
+          accept=".txt,.json"
+          multiple
+          required
+          className="input"
+          style={{ height: "auto", paddingBlock: "10px" }}
+        />
+        <span className="field__hint">
+          WhatsApp .txt or Instagram .json files, mixed or separate — up to 5MB each.
+        </span>
       </label>
 
       {state.status === "error" && <p className="notice notice--error">{state.message}</p>}
