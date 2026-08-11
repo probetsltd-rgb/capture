@@ -127,7 +127,7 @@ export default async function UploadPage({
                     <span className="flow__dot" />
                   </span>
                   <span>
-                    <span className="flow__label">Wait for the email, then download and unzip it</span>
+                    <span className="flow__label">Wait for the email, then download it</span>
                     <span className="flow__note" style={{ display: "block" }}>
                       Can take anywhere from minutes to a few hours
                     </span>
@@ -138,16 +138,20 @@ export default async function UploadPage({
                     <span className="flow__dot" />
                   </span>
                   <span>
-                    <span className="flow__label">
-                      Upload the message_1.json files from inside messages/inbox
-                    </span>
+                    <span className="flow__label">Upload the .zip exactly as downloaded</span>
                     <span className="flow__note" style={{ display: "block" }}>
-                      Every conversation&apos;s file has the same name — that&apos;s fine, upload
-                      them all together and we&apos;ll sort out which is which
+                      No need to extract it — we unzip it in your browser and pull out the
+                      conversations automatically
                     </span>
                   </span>
                 </li>
               </ol>
+              <p className="meta" style={{ marginTop: "var(--s3)" }}>
+                Older browser, or the automatic unzip doesn&apos;t work? Extract the .zip yourself
+                and upload the <code>message_1.json</code> files from inside{" "}
+                <code>messages/inbox</code> instead — every conversation&apos;s file has the same
+                name, that&apos;s fine, upload them all together.
+              </p>
             </div>
 
             <div className="intake__form">
