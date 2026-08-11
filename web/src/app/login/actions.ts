@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { safeNextPath } from "@/lib/safe-redirect";
+import { getSiteUrl } from "@/lib/site-url";
 
 // Any email can request a magic link and authenticate (shouldCreateUser
 // defaults true) — access beyond login is gated entirely by
@@ -24,7 +25,7 @@ export async function requestMagicLink(
   const { error } = await supabase.auth.signInWithOtp({
     email,
     options: {
-      emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/confirm?next=${encodeURIComponent(next)}`,
+      emailRedirectTo: `${getSiteUrl()}/auth/confirm?next=${encodeURIComponent(next)}`,
     },
   });
 
