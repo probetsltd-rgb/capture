@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getOwnBusinessId } from "@/lib/business-membership";
+import { MAX_AUTOMATIONS_PER_OPPORTUNITY } from "@/lib/recover/rules";
 import { RulesForm } from "./RulesForm";
 
 export default async function DashboardSettingsPage() {
@@ -15,7 +16,7 @@ export default async function DashboardSettingsPage() {
 
   const { data: business } = await supabase
     .from("businesses")
-    .select("id, name, max_ai_followups, max_recover_followups, escalation_keywords")
+    .select("id, name, max_recover_followups, escalation_keywords")
     .eq("id", businessId)
     .maybeSingle();
 
@@ -27,15 +28,11 @@ export default async function DashboardSettingsPage() {
         <Link href="/dashboard">← Back to dashboard</Link>
       </p>
       <h1>Configure rules — {business.name}</h1>
-      <p style={{ color: "#666", fontSize: "0.9rem" }}>
-        Overrides the platform defaults (2 follow-ups max for both Recover and Prevent). Leave a field blank to
-        use the default.
-      </p>
       <RulesForm
         businessId={businessId}
-        maxAiFollowups={business.max_ai_followups}
         maxRecoverFollowups={business.max_recover_followups}
         escalationKeywords={(business.escalation_keywords as string[] | null) ?? []}
+        platformMaxRecoverFollowups={MAX_AUTOMATIONS_PER_OPPORTUNITY}
       />
     </main>
   );

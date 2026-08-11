@@ -43,7 +43,6 @@ export default async function DashboardPage() {
     { data: findConversations },
     { data: preventConversations },
     { count: knowledgeCount },
-    { count: messagesCount },
   ] = await Promise.all([
     supabase.from("opportunities").select("status, actual_revenue").eq("business_id", businessId),
     supabase.from("conversations").select("id").eq("business_id", businessId).eq("source", "manual_export").limit(1),
@@ -52,8 +51,11 @@ export default async function DashboardPage() {
       .select("id, escalated_at, qualification, ai_followup_count")
       .eq("business_id", businessId)
       .eq("source", "whatsapp_api"),
-    supabase.from("knowledge_items").select("id", { count: "exact", head: true }).eq("business_id", businessId),
-    supabase.from("messages").select("id", { count: "exact", head: true }).eq("business_id", businessId),
+    supabase
+      .from("knowledge_items")
+      .select("id", { count: "exact", head: true })
+      .eq("business_id", businessId)
+      .not("approved_at", "is", null),
   ]);
 
   const preventConvs = preventConversations ?? [];
@@ -63,9 +65,18 @@ export default async function DashboardPage() {
     : { data: [] };
   const answeredIds = new Set((aiMessages ?? []).map((m) => m.conversation_id));
 
+  // Scoped to Prevent conversations only — see north-star.ts on why the
+  // uploaded Find history must not count as "messages handled".
+  const { count: handledMessagesCount } = preventConvIds.length
+    ? await supabase
+        .from("messages")
+        .select("id", { count: "exact", head: true })
+        .in("conversation_id", preventConvIds)
+    : { count: 0 };
+
   const recover = computeRecoverSummary(opportunities ?? []);
   const prevent = computePreventSummary(preventConvs, answeredIds);
-  const northStar = computeNorthStar(messagesCount ?? 0, opportunities ?? []);
+  const northStar = computeNorthStar(handledMessagesCount ?? 0, opportunities ?? []);
 
   const hasFindData = (findConversations?.length ?? 0) > 0;
 

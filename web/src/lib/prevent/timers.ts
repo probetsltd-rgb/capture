@@ -1,13 +1,12 @@
-// PRD §24 controlled follow-up — same one-further-follow-up discipline as
-// Recover's MAX_AUTOMATIONS_PER_OPPORTUNITY (web/src/lib/recover/rules.ts).
-// Overridable per business via businesses.max_ai_followups (Phase 4
-// "Configure Rules") — no live caller sets a follow-up yet (OUTSTANDINGS.md),
-// so the override plumbing here is ahead of a real call site, kept
-// consistent with Recover's equivalent rather than left to drift.
-export const MAX_AI_FOLLOWUPS = 2;
-export function canSendFollowup(currentCount: number, max: number = MAX_AI_FOLLOWUPS): boolean {
-  return currentCount < max;
-}
+// PRD §24's controlled-follow-up cap previously lived here as
+// MAX_AI_FOLLOWUPS/canSendFollowup(). Removed: nothing ever called it.
+// There is no proactive AI-follow-up scheduler in the codebase, so the
+// function guarded a feature that does not exist while a settings control
+// invited businesses to tune it — a number that looked like a safety
+// setting and changed nothing. The conversations.ai_followup_count column
+// and businesses.max_ai_followups remain (the dashboard reports the former;
+// vertical templates seed the latter) so the cap can be reinstated at a
+// real call site when the scheduler is actually built. See OUTSTANDINGS.md.
 
 // PRD §22 escalation timers — pure logic, separate from the Cron route
 // that calls it, so the timing rules are testable without waiting real

@@ -20,11 +20,42 @@ export async function addKnowledgeItem(
   if (!content) return { ok: false, message: "Content is required." };
 
   const supabase = await createClient();
-  const { error } = await supabase.from("knowledge_items").insert({ business_id: businessId, category, question, content });
+  // Approved on creation: a human authored this text in this form. Only
+  // machine-seeded rows (vertical templates) start unapproved.
+  const { error } = await supabase.from("knowledge_items").insert({
+    business_id: businessId,
+    category,
+    question,
+    content,
+    approved_at: new Date().toISOString(),
+  });
   if (error) return { ok: false, message: "Could not save — check you have access to this business." };
 
   revalidatePath(`/admin/prevent/${businessId}/knowledge`);
   return { ok: true, message: "Added." };
+}
+
+// Vertical-template items land unapproved and are invisible to the response
+// engine until a human confirms the content is actually true for this
+// business — see supabase/migrations/20260811000003_phase4_hardening.sql.
+export async function approveKnowledgeItem(businessId: string, itemId: string): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("knowledge_items")
+    .update({ approved_at: new Date().toISOString() })
+    .eq("id", itemId)
+    .eq("business_id", businessId)
+    .select("id");
+
+  if (error) return { ok: false, message: "Could not approve." };
+  // An RLS-filtered UPDATE returns no error and zero rows — treat that as
+  // the failure it is rather than reporting success.
+  if (!data || data.length === 0) {
+    return { ok: false, message: "Could not approve — check you have access to this business." };
+  }
+
+  revalidatePath(`/admin/prevent/${businessId}/knowledge`);
+  return { ok: true, message: "Approved — the AI can now use this." };
 }
 
 export async function deleteKnowledgeItem(businessId: string, itemId: string): Promise<ActionResult> {

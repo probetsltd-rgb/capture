@@ -62,8 +62,17 @@ export async function handleInboundMessage(
     return { status: "suppressed_human_active" };
   }
 
+  // `.not("approved_at", "is", null)` is load-bearing, not a filter for
+  // tidiness: vertical-template onboarding (Phase 4) seeds knowledge_items
+  // with generic boilerplate no business ever confirmed. Answering from an
+  // unapproved row would break the one guarantee Prevent makes — that every
+  // statement to a customer came from knowledge the business approved.
   const [{ data: knowledge }, { data: business }] = await Promise.all([
-    supabase.from("knowledge_items").select("category, question, content").eq("business_id", businessId),
+    supabase
+      .from("knowledge_items")
+      .select("category, question, content")
+      .eq("business_id", businessId)
+      .not("approved_at", "is", null),
     supabase.from("businesses").select("escalation_keywords").eq("id", businessId).maybeSingle(),
   ]);
   const extraEscalationKeywords = (business?.escalation_keywords as string[] | null) ?? [];

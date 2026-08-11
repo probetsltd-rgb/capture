@@ -2,6 +2,13 @@
 // Progression: Messages handled -> Opportunities identified -> Opportunities
 // recovered -> Revenue recovered -> Revenue protected/generated.
 //
+// `messagesHandled` means messages Capture actually handled — i.e. Prevent
+// conversations. It deliberately excludes the historical WhatsApp export a
+// business uploads for its Find audit: those are messages the business
+// handled itself, before Capture was involved, and counting them would
+// inflate the headline metric by thousands on day one. PRD §45's own
+// warning against vanity metrics is the reason this distinction matters.
+//
 // Only Recover's leg (revenue recovered, from real Won outcomes) is actually
 // measurable in V1 — Prevent's "revenue protected/generated" is explicitly
 // not tracked yet (see PLANS.md Phase 3 Prevent Dashboard note). This

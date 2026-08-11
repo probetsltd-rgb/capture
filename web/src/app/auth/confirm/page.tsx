@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
+import { safeNextPath } from "@/lib/safe-redirect";
 
 // Client component, not a Route Handler — deliberately. Supabase's magic-link
 // email points at Supabase's own hosted /auth/v1/verify endpoint, which (with
@@ -22,7 +23,10 @@ function ConfirmInner() {
 
   useEffect(() => {
     const supabase = createClient();
-    const next = searchParams.get("next") || "/admin";
+    // Re-validated here, not just at the /login end that produced the link:
+    // this component is the actual redirect sink and the value arrives from
+    // a URL, so it cannot be assumed to have come from our own form.
+    const next = safeNextPath(searchParams.get("next"));
 
     async function complete() {
       const tokenHash = searchParams.get("token_hash");

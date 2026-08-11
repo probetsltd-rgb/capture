@@ -78,16 +78,28 @@ export function computePriorityScore(
 
 // PRD §12: "One further follow-up where appropriate → Stop." First contact
 // + at most one follow-up = 2 total automation attempts per opportunity.
-// Businesses can lower (never silently raise past what's sane) this via
-// businesses.max_recover_followups — Phase 4 "Configure Rules" — see
-// admin/recover/[businessId]/actions.ts's markContacted for the override lookup.
 export const MAX_AUTOMATIONS_PER_OPPORTUNITY = 2;
+
+/**
+ * A business may tighten this via businesses.max_recover_followups (Phase 4
+ * "Configure Rules"); it must never be able to loosen it. PRD §12's cap is a
+ * promise to the *customer being messaged*, not a business preference, so the
+ * platform maximum is clamped here at the enforcement point rather than only
+ * validated at the settings form — a value written directly to the database
+ * (or by any future caller that forgets to validate) still cannot exceed it.
+ * The DB CHECK constraint in 20260811000003_phase4_hardening.sql is the third
+ * layer, not the only one.
+ */
+export function effectiveMaxContacts(configured: number | null | undefined): number {
+  if (configured === null || configured === undefined) return MAX_AUTOMATIONS_PER_OPPORTUNITY;
+  return Math.max(0, Math.min(configured, MAX_AUTOMATIONS_PER_OPPORTUNITY));
+}
 
 export function canLogAnotherContact(
   existingAutomationCount: number,
-  max: number = MAX_AUTOMATIONS_PER_OPPORTUNITY,
+  configuredMax: number | null | undefined = undefined,
 ): boolean {
-  return existingAutomationCount < max;
+  return existingAutomationCount < effectiveMaxContacts(configuredMax);
 }
 
 // PRD §32/§12: the moment a customer responds, automation stops — no

@@ -1,9 +1,9 @@
 "use server";
 
-import { randomBytes } from "node:crypto";
 import { headers } from "next/headers";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { generateUploadToken } from "@/lib/upload-token";
 import {
   INDUSTRIES,
   REVENUE_BUCKETS,
@@ -82,7 +82,7 @@ export async function submitIntake(
     };
   }
 
-  const uploadToken = randomBytes(32).toString("hex");
+  const uploadToken = generateUploadToken();
 
   const supabase = createServiceRoleClient();
   const { error } = await supabase.from("businesses").insert({

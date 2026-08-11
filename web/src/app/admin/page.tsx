@@ -40,16 +40,24 @@ export default async function AdminPage() {
   // (OUTSTANDINGS.md DEV-1) are excluded so a founder can't mistake fixture
   // data for real influenced revenue.
   const realBusinessIds = businesses.filter((b) => !b.is_simulated).map((b) => b.id);
-  const [{ data: conversations }, { data: allOpportunities }, { count: allMessagesCount }] = await Promise.all([
-    supabase.from("conversations").select("business_id, classified_at").in("business_id", businessIds),
+  const [{ data: conversations }, { data: allOpportunities }] = await Promise.all([
+    supabase.from("conversations").select("id, business_id, classified_at, source").in("business_id", businessIds),
     realBusinessIds.length
       ? supabase.from("opportunities").select("status, actual_revenue").in("business_id", realBusinessIds)
       : Promise.resolve({ data: [] as { status: string; actual_revenue: number | null }[] }),
-    realBusinessIds.length
-      ? supabase.from("messages").select("id", { count: "exact", head: true }).in("business_id", realBusinessIds)
-      : Promise.resolve({ count: 0 }),
   ]);
-  const northStar = computeNorthStar(allMessagesCount ?? 0, allOpportunities ?? []);
+
+  // "Messages handled" counts Prevent conversations only — the uploaded Find
+  // history is messages the business handled itself before Capture existed.
+  // See lib/report/north-star.ts.
+  const realBusinessIdSet = new Set(realBusinessIds);
+  const preventConvIds = (conversations ?? [])
+    .filter((c) => c.source === "whatsapp_api" && realBusinessIdSet.has(c.business_id))
+    .map((c) => c.id);
+  const { count: handledMessagesCount } = preventConvIds.length
+    ? await supabase.from("messages").select("id", { count: "exact", head: true }).in("conversation_id", preventConvIds)
+    : { count: 0 };
+  const northStar = computeNorthStar(handledMessagesCount ?? 0, allOpportunities ?? []);
 
   const conversationCounts = new Map<string, { total: number; classified: number }>();
   for (const c of conversations ?? []) {

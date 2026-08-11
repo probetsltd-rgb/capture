@@ -5,16 +5,20 @@ import { updateRules, type ActionResult } from "../actions";
 
 const initialState: ActionResult = { ok: false, message: "" };
 
+// No "Max Prevent AI follow-ups" control here on purpose: nothing in the
+// codebase schedules proactive AI follow-ups yet, so the setting would
+// persist a number that never affects behaviour. Shipping a control that
+// silently does nothing is worse than not shipping it. See OUTSTANDINGS.md.
 export function RulesForm({
   businessId,
-  maxAiFollowups,
   maxRecoverFollowups,
   escalationKeywords,
+  platformMaxRecoverFollowups,
 }: {
   businessId: string;
-  maxAiFollowups: number | null;
   maxRecoverFollowups: number | null;
   escalationKeywords: string[];
+  platformMaxRecoverFollowups: number;
 }) {
   const action = updateRules.bind(null, businessId);
   const [state, formAction, pending] = useActionState(action, initialState);
@@ -22,25 +26,19 @@ export function RulesForm({
   return (
     <form action={formAction}>
       <label style={{ display: "block", marginBottom: "1rem" }}>
-        Max Prevent AI follow-ups
-        <input
-          type="number"
-          name="max_ai_followups"
-          min={0}
-          defaultValue={maxAiFollowups ?? ""}
-          style={{ display: "block", width: "100%", padding: "0.5rem", marginTop: "0.25rem" }}
-        />
-      </label>
-
-      <label style={{ display: "block", marginBottom: "1rem" }}>
         Max Recover follow-up contacts
         <input
           type="number"
           name="max_recover_followups"
           min={0}
+          max={platformMaxRecoverFollowups}
           defaultValue={maxRecoverFollowups ?? ""}
           style={{ display: "block", width: "100%", padding: "0.5rem", marginTop: "0.25rem" }}
         />
+        <span style={{ fontSize: "0.8rem", color: "#666" }}>
+          Blank uses the platform default ({platformMaxRecoverFollowups}). You can lower this, but not raise it —
+          the cap is a promise to your customers, not a preference.
+        </span>
       </label>
 
       <label style={{ display: "block", marginBottom: "1rem" }}>
@@ -52,6 +50,10 @@ export function RulesForm({
           placeholder="e.g. fraud, refund, allergy"
           style={{ display: "block", width: "100%", padding: "0.5rem", marginTop: "0.25rem" }}
         />
+        <span style={{ fontSize: "0.8rem", color: "#666" }}>
+          Any message containing one of these goes straight to a human, before the AI sees it. Minimum 3 characters
+          each. Clearing this field removes all extra keywords.
+        </span>
       </label>
 
       {state.message && <p style={{ color: state.ok ? "#888" : "crimson" }}>{state.message}</p>}

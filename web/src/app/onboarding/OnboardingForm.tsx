@@ -61,6 +61,15 @@ export function OnboardingForm() {
         />
       </label>
 
+      <label style={{ display: "block", marginBottom: "1rem", fontSize: "0.9rem" }}>
+        <input type="checkbox" name="consent" /> I agree to Capture processing my business&apos;s customer
+        conversations to identify and recover revenue leakage, as described in the{" "}
+        <a href="/privacy" target="_blank" rel="noopener noreferrer">
+          privacy policy
+        </a>
+        .
+      </label>
+
       {!state.ok && state.message && <p style={{ color: "crimson" }}>{state.message}</p>}
       <button type="submit" disabled={pending} style={{ padding: "0.6rem 1.2rem" }}>
         {pending ? "Creating…" : "Create my workspace"}

@@ -226,6 +226,20 @@ No code in this phase. Methodology and working templates: [phase0/AUDIT_GUIDE.md
 - [x] A configuration template reused across ≥2 different verticals without custom code — verified: `real_estate` and `automotive` templates applied via the identical `applyVerticalTemplate()` path for two different test businesses, each correctly getting their own distinct knowledge items/keywords (TESTS.md 2026-08-11).
 - [ ] Regression: full suite from Phases 1–3 still passes — tenant isolation re-verified for real this session (TESTS.md 2026-08-11); the rest of Phases 1-3's gate tests were not formally re-run (no schema/RLS changes to their tables beyond additive columns), consistent with how Phase 3's own gate section treats this same caveat.
 
+### Phase 4 Hardening Audit (2026-08-11)
+
+A full-build audit run after Phase 4 shipped. **14 confirmed defects found and fixed** — see TESTS.md's "Phase 4 — Hardening Audit" section for the evidence behind each. Every finding was reproduced against the running system before being fixed and re-verified after.
+
+The three that mattered most, all introduced by opening the platform to self-service signup:
+
+- **Vertical-template knowledge was treated as business-approved fact.** Phase 4's per-vertical templates seeded `knowledge_items` with boilerplate written in a migration, and both the response engine and the Prevent activation gate accepted it. A business could sign up, activate, and have the AI state fabricated opening hours and cancellation terms to real customers — collapsing the exact guarantee Phase 3 was built around and adversarially tested for. This is the clearest lesson of the audit: **Phase 3's safety property was never encoded, only implied by how rows happened to be created.** A Phase 4 convenience feature invalidated it without touching any Phase 3 code or failing any existing test. Now explicit via `knowledge_items.approved_at`, and added to the regression watch list.
+- **PRD §12's anti-spam follow-up cap was user-defeatable** — a business could set it to 500 via the settings form. Now clamped at the enforcement point, validated in the action, and bounded by a DB CHECK.
+- **Open redirect** — the `next` param blocked `//` but not `/\`, which browsers resolve to an external origin, and the actual redirect sink validated nothing at all.
+
+Also fixed: self-serve businesses were created with no `upload_token` (every Find link rendered `/upload/null`); RLS-denied writes reported success to the user; signup captured no consent record; business+owner creation was non-atomic and could strand orphan tenants; the claim race was a read-then-write check; the LLM endpoint was unmetered; stop-on-response was enforced only by hiding a button; "Messages handled" counted the uploaded Find history; and two pieces of dead code were removed — including a settings control that persisted a number nothing ever read.
+
+**Standing lesson for future phases:** a safety invariant that lives only in "how the data usually gets created" is not enforced. If a guarantee matters, it needs a column, a constraint, or a check that a new feature has to actively defeat rather than merely bypass.
+
 ---
 
 ## Hypotheses Tracker (PRD §46)

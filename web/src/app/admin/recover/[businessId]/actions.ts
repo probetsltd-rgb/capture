@@ -83,14 +83,30 @@ export async function startCampaign(businessId: string): Promise<ActionResult> {
 export async function markContacted(opportunityId: string, businessId: string): Promise<ActionResult> {
   const supabase = await createClient();
 
-  const [{ data: existing }, { data: business }] = await Promise.all([
+  const [{ data: existing }, { data: business }, { data: opportunity }] = await Promise.all([
     supabase
       .from("automations")
       .select("id")
       .eq("opportunity_id", opportunityId)
       .in("status", ["sent", "responded", "completed"]),
     supabase.from("businesses").select("max_recover_followups").eq("id", businessId).maybeSingle(),
+    supabase.from("opportunities").select("status").eq("id", opportunityId).maybeSingle(),
   ]);
+
+  if (!opportunity) {
+    return { ok: false, message: "Opportunity not found — check you have access to this business." };
+  }
+
+  // PRD §32/§12: once a customer has responded (or the outcome is settled),
+  // outreach stops permanently. Previously this was enforced only by the UI
+  // not rendering a button, which is not enforcement — the action is
+  // directly callable.
+  if (isTerminal(opportunity.status)) {
+    return {
+      ok: false,
+      message: "This customer has already responded — no further outreach (PRD §32).",
+    };
+  }
 
   const maxFollowups = business?.max_recover_followups ?? undefined;
   if (!canLogAnotherContact(existing?.length ?? 0, maxFollowups)) {
@@ -171,5 +187,3 @@ export async function recordOutcome(
   revalidatePath(`/admin/recover/${businessId}`);
   return { ok: true, message: "Outcome recorded." };
 }
-
-export { isTerminal };
