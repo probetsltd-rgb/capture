@@ -2,7 +2,7 @@
 
 import { useActionState, useRef, useState } from "react";
 import Link from "next/link";
-import { submitUpload, type UploadState } from "./actions";
+import { submitUpload, type UploadState, type SkippedFile } from "./actions";
 import { unzipJsonFiles, ZipParseError, type UnzipDiagnostics } from "@/lib/instagram/unzip";
 
 // Turns "found nothing" into an answer rather than a dead end. The most
@@ -25,6 +25,39 @@ function describeEmptyZip(zipName: string, diagnostics: UnzipDiagnostics): strin
 }
 
 const initialState: UploadState = { status: "idle", message: null };
+
+// A real Instagram "full export" .zip contains dozens of non-message files
+// (posts, likes, ads data, login activity...) alongside the message_N.json
+// files we want — skipping ~40 of those is the normal, expected case, not
+// 40 individual problems. Dumping one line per file as inline text (the
+// original behaviour) turned a routine result into an intimidating wall of
+// text — a founder caught this in production. Grouped by reason and tucked
+// behind <details> instead: one line per reason up front, full filenames
+// only for whoever actually wants them.
+function SkippedFilesDetails({ skipped }: { skipped: SkippedFile[] }) {
+  const byReason = new Map<string, string[]>();
+  for (const { name, reason } of skipped) {
+    const names = byReason.get(reason) ?? [];
+    names.push(name);
+    byReason.set(reason, names);
+  }
+
+  return (
+    <details className="meta">
+      <summary>{skipped.length} file(s) skipped — details</summary>
+      <div className="stack" style={{ marginTop: "var(--s2)" }}>
+        {[...byReason.entries()].map(([reason, names]) => (
+          <div key={reason}>
+            <strong style={{ color: "var(--ink)", fontWeight: 500 }}>
+              {names.length} {reason}
+            </strong>
+            <p style={{ margin: 0 }}>{names.join(", ")}</p>
+          </div>
+        ))}
+      </div>
+    </details>
+  );
+}
 
 // Instagram's real export arrives as a .zip with conversations buried in
 // nested folders (your_instagram_activity/messages/inbox/<person>/
@@ -92,6 +125,7 @@ export function UploadForm({ token }: { token: string }) {
     return (
       <div className="stack">
         <p className="notice notice--ok">{state.message}</p>
+        {state.skipped && state.skipped.length > 0 && <SkippedFilesDetails skipped={state.skipped} />}
         <Link href={`/report/${token}`} className="btn btn--primary">
           View my Revenue Leak Report
         </Link>
@@ -140,7 +174,12 @@ export function UploadForm({ token }: { token: string }) {
       </label>
 
       {extractError && <p className="notice notice--error">{extractError}</p>}
-      {state.status === "error" && !extractError && <p className="notice notice--error">{state.message}</p>}
+      {state.status === "error" && !extractError && (
+        <>
+          <p className="notice notice--error">{state.message}</p>
+          {state.skipped && state.skipped.length > 0 && <SkippedFilesDetails skipped={state.skipped} />}
+        </>
+      )}
 
       <button type="submit" disabled={pending || extracting} className="btn btn--primary btn--block">
         {extracting ? "Unzipping…" : pending ? "Uploading…" : "Upload conversations"}

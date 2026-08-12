@@ -2,9 +2,11 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
 import { safeNextPath } from "@/lib/safe-redirect";
+import { SiteNav, SiteFooter } from "@/components/SiteChrome";
 
 // Client component, not a Route Handler — deliberately. Supabase's magic-link
 // email points at Supabase's own hosted /auth/v1/verify endpoint, which (with
@@ -59,7 +61,13 @@ function ConfirmInner() {
         return;
       }
 
-      setError("This sign-in link is invalid or has expired.");
+      // No token_hash/type and no hash-fragment tokens at all — most often
+      // because the link was already used (each one is single-use; a second
+      // click, or an email app pre-opening the link to scan it for safety,
+      // both consume it before the real click), or because it's simply past
+      // its 1-hour expiry. Named explicitly rather than a generic "invalid"
+      // so a real, common cause doesn't read as a mystery failure.
+      setError("This link has already been used or has expired.");
     }
 
     complete();
@@ -68,26 +76,57 @@ function ConfirmInner() {
 
   if (error) {
     return (
-      <main style={{ maxWidth: 480, margin: "4rem auto", fontFamily: "sans-serif" }}>
-        <h1>Sign-in failed</h1>
-        <p>{error}</p>
-        <p>
-          <a href="/login">Try again</a>
-        </p>
-      </main>
+      <div className="page">
+        <SiteNav />
+        <main>
+          <div className="shell center-page">
+            <h1 className="h2">Sign-in link didn&apos;t work</h1>
+            <p className="body" style={{ marginTop: "var(--s3)" }}>
+              {error}
+            </p>
+            <p className="meta" style={{ marginTop: "var(--s3)" }}>
+              This usually happens when a link is clicked twice, opened by an email app scanning
+              it for safety, or used more than an hour after it was sent — each link only works
+              once. Request a fresh one below.
+            </p>
+            <Link href="/login" className="btn btn--primary" style={{ marginTop: "var(--s5)" }}>
+              Send a new sign-in link
+            </Link>
+          </div>
+        </main>
+        <SiteFooter />
+      </div>
     );
   }
 
   return (
-    <main style={{ maxWidth: 480, margin: "4rem auto", fontFamily: "sans-serif" }}>
-      <p>Signing you in…</p>
-    </main>
+    <div className="page">
+      <SiteNav />
+      <main>
+        <div className="shell center-page">
+          <p className="body">Signing you in…</p>
+        </div>
+      </main>
+      <SiteFooter />
+    </div>
   );
 }
 
 export default function AuthConfirmPage() {
   return (
-    <Suspense fallback={<p style={{ maxWidth: 480, margin: "4rem auto", fontFamily: "sans-serif" }}>Loading…</p>}>
+    <Suspense
+      fallback={
+        <div className="page">
+          <SiteNav />
+          <main>
+            <div className="shell center-page">
+              <p className="body">Loading…</p>
+            </div>
+          </main>
+          <SiteFooter />
+        </div>
+      }
+    >
       <ConfirmInner />
     </Suspense>
   );

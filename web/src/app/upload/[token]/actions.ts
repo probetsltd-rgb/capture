@@ -9,9 +9,12 @@ import { parseWhatsAppExport, guessBusinessSenderName, type ParsedConversation }
 import { groupInstagramExportFiles, parseInstagramConversation } from "@/lib/instagram/parse";
 import { classifyConversation } from "@/lib/classification/classify";
 
+export type SkippedFile = { name: string; reason: string };
+
 export type UploadState = {
   status: "idle" | "error" | "success";
   message: string | null;
+  skipped?: SkippedFile[];
 };
 
 // The meaningful limit on a single upload batch — checked AFTER Instagram's
@@ -105,7 +108,7 @@ export async function submitUpload(
   //   for a long history), so this is a grouping pass before parsing, not a
   //   1:1 file-to-conversation loop like the WhatsApp path.
   const parsedByFile: { name: string; channel: "whatsapp" | "instagram"; parsed: ParsedConversation }[] = [];
-  const skipped: string[] = [];
+  const skipped: SkippedFile[] = [];
 
   const txtFiles = files.filter((f) => f.name.toLowerCase().endsWith(".txt"));
   const jsonFiles = files.filter((f) => f.name.toLowerCase().endsWith(".json"));
@@ -113,13 +116,13 @@ export async function submitUpload(
   for (const file of txtFiles) {
     const buffer = new Uint8Array(await file.arrayBuffer());
     if (!looksLikeText(buffer)) {
-      skipped.push(`${file.name} (not plain text)`);
+      skipped.push({ name: file.name, reason: "not plain text" });
       continue;
     }
     const text = new TextDecoder("utf-8").decode(buffer);
     const parsed = parseWhatsAppExport(text);
     if (!parsed) {
-      skipped.push(`${file.name} (no messages found)`);
+      skipped.push({ name: file.name, reason: "no messages found" });
       continue;
     }
     parsedByFile.push({ name: file.name, channel: "whatsapp", parsed });
@@ -129,12 +132,17 @@ export async function submitUpload(
   for (const file of jsonFiles) {
     const buffer = new Uint8Array(await file.arrayBuffer());
     if (!looksLikeText(buffer)) {
-      skipped.push(`${file.name} (not plain text)`);
+      skipped.push({ name: file.name, reason: "not plain text" });
       continue;
     }
     const text = new TextDecoder("utf-8").decode(buffer);
     if (!looksLikeInstagramExport(text)) {
-      skipped.push(`${file.name} (not a recognised Instagram export file)`);
+      // Real Instagram exports include many non-message files (posts,
+      // likes, ads data, account activity...) alongside the message_N.json
+      // files we actually want — this is the expected, common case for a
+      // full-export .zip, not a sign of a broken upload. Worded as such so
+      // a genuinely large skip count doesn't read as N failures.
+      skipped.push({ name: file.name, reason: "not a conversation export file" });
       continue;
     }
     jsonFileTexts.push({ name: file.name, text });
@@ -142,12 +150,12 @@ export async function submitUpload(
 
   if (jsonFileTexts.length > 0) {
     const { groups, unparseable } = groupInstagramExportFiles(jsonFileTexts);
-    for (const name of unparseable) skipped.push(`${name} (not a recognised Instagram export file)`);
+    for (const name of unparseable) skipped.push({ name, reason: "not a conversation export file" });
 
     for (const [conversationKey, pages] of groups) {
       const parsed = parseInstagramConversation(pages);
       if (!parsed) {
-        skipped.push(`${conversationKey} (no messages found)`);
+        skipped.push({ name: conversationKey, reason: "no messages found" });
         continue;
       }
       parsedByFile.push({ name: conversationKey, channel: "instagram", parsed });
@@ -157,7 +165,8 @@ export async function submitUpload(
   if (parsedByFile.length === 0) {
     return {
       status: "error",
-      message: `None of the uploaded files could be read as WhatsApp or Instagram exports. ${skipped.join("; ")}`,
+      message: "None of the uploaded files could be read as WhatsApp or Instagram exports.",
+      skipped,
     };
   }
 
@@ -299,9 +308,9 @@ export async function submitUpload(
     });
   });
 
-  const skippedNote = skipped.length > 0 ? ` (${skipped.length} file(s) skipped: ${skipped.join("; ")})` : "";
   return {
     status: "success",
-    message: `Received ${created} conversation(s)${skippedNote}. We'll be in touch once your Revenue Leak Report is ready.`,
+    message: `Received ${created} conversation${created === 1 ? "" : "s"}. Your Revenue Leak Report is ready below.`,
+    skipped: skipped.length > 0 ? skipped : undefined,
   };
 }

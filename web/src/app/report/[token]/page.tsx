@@ -161,8 +161,9 @@ export default async function ReportPage({
             <section className="report__block">
               <h2 className="h3">Revenue Readiness Score</h2>
               <p className="meta" style={{ marginTop: "var(--s2)", maxWidth: "52ch" }}>
-                A communication device, not a predictive model — how consistently enquiries get a
-                response, a follow-up, and a second chance.
+                How consistently your team responds to, follows up with, and re-engages
+                customers — not a forecast of how much you&apos;ll earn. A low score means gaps
+                in your process, not a ceiling on your revenue.
               </p>
               <div className="surface" style={{ marginTop: "var(--s4)" }}>
                 <div className="panel__body">

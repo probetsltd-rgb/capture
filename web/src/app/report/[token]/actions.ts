@@ -5,6 +5,8 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 export type InterestState = {
   status: "idle" | "error" | "success";
   message: string | null;
+  wantsRecover?: boolean;
+  wantsPrevent?: boolean;
 };
 
 export async function captureInterest(
@@ -33,5 +35,5 @@ export async function captureInterest(
     return { status: "error", message: "Something went wrong. Please try again." };
   }
 
-  return { status: "success", message: "Thanks — we'll be in touch." };
+  return { status: "success", message: null, wantsRecover, wantsPrevent };
 }
