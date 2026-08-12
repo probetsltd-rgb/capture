@@ -10,7 +10,16 @@
 // rather than needing to defend against it. Revisit only if this becomes a
 // real onboarding blocker.
 
-export const MAX_FILES_PER_UPLOAD = 120; // PRD §7: ~20–50 conversations; Instagram exports can split one conversation across several message_N.json pages, so this allows headroom beyond a 1-file-per-conversation assumption
+// A raw pre-grouping safety backstop, not the meaningful business limit —
+// that's MAX_CONVERSATIONS_PER_UPLOAD in upload/[token]/actions.ts, checked
+// after Instagram's multi-page conversations are grouped down to their real
+// count. Conflating the two was a real bug: a real 6-month/~200-conversation
+// export can legitimately produce 200+ raw message_N.json files before
+// grouping, and this check ran before that grouping ever happened, so it
+// was rejecting real audits based on a number that didn't mean what the
+// error message implied. Kept high and separate specifically so it never
+// becomes the operative limit for a real Instagram export again.
+export const MAX_FILES_PER_UPLOAD = 400;
 export const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // both export formats are typically well under 1MB per file
 
 const ACCEPTED_EXTENSIONS = [".txt", ".json"];
