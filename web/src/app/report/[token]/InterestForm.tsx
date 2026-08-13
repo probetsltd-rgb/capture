@@ -13,7 +13,7 @@ const initialState: InterestState = { status: "idle", message: null };
 // interest flags are still recorded server-side (captureInterest) as an
 // admin-visible signal, but the user-facing outcome is now a direct route
 // into the account that actually does the thing they just asked for.
-export function InterestForm({ token }: { token: string }) {
+export function InterestForm({ token, isSignedIn }: { token: string; isSignedIn: boolean }) {
   const action = captureInterest.bind(null, token);
   const [state, formAction, pending] = useActionState(action, initialState);
 
@@ -26,9 +26,15 @@ export function InterestForm({ token }: { token: string }) {
     return (
       <div className="stack">
         <p className="notice notice--ok">Good — let&apos;s get {label} running.</p>
-        <Link href={`/signup?claim=${token}`} className="btn btn--primary">
-          Create your free account →
-        </Link>
+        {isSignedIn ? (
+          <Link href="/dashboard" className="btn btn--primary">
+            Go to your dashboard →
+          </Link>
+        ) : (
+          <Link href={`/signup?claim=${token}`} className="btn btn--primary">
+            Create your free account →
+          </Link>
+        )}
       </div>
     );
   }

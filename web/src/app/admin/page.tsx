@@ -159,6 +159,7 @@ export default async function AdminPage() {
 
       <section>
         <h2>Businesses</h2>
+        <div className="table__scroll">
         <table className="table">
           <thead>
             <tr >
@@ -199,6 +200,7 @@ export default async function AdminPage() {
             })}
           </tbody>
         </table>
+        </div>
       </section>
     </main>
   );

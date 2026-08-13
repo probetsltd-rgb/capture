@@ -87,72 +87,74 @@ export default async function DashboardPage() {
         {business.industry ?? "No industry set"} · <Link href="/dashboard/settings">Configure rules →</Link>
       </p>
 
-      <section >
-        <h2>Find</h2>
-        {hasFindData ? (
-          <p>
-            <Link href={`/report/${business.upload_token}`}>View your Revenue Leak Report →</Link>
-          </p>
-        ) : (
-          <p>
-            No conversations uploaded yet.{" "}
-            <Link href={`/upload/${business.upload_token}`}>Upload WhatsApp conversations →</Link>
-          </p>
-        )}
-      </section>
+      <div className="app-grid">
+        <section>
+          <h2>Find</h2>
+          {hasFindData ? (
+            <p>
+              <Link href={`/report/${business.upload_token}`}>View your Revenue Leak Report →</Link>
+            </p>
+          ) : (
+            <p>
+              No conversations uploaded yet.{" "}
+              <Link href={`/upload/${business.upload_token}`}>Upload WhatsApp or Instagram conversations →</Link>
+            </p>
+          )}
+        </section>
 
-      <section >
-        <h2>Recover {business.recover_activated_at ? "· Active" : "· Not activated"}</h2>
-        <table className="table">
-          <tbody>
-            <tr>
-              <td >Opportunities identified</td>
-              <td>{recover.identified}</td>
-            </tr>
-            <tr>
-              <td >Contacted</td>
-              <td>{recover.contacted}</td>
-            </tr>
-            <tr>
-              <td >Revenue recovered</td>
-              <td >{formatNaira(recover.revenueRecovered)}</td>
-            </tr>
-          </tbody>
-        </table>
-        <p>
-          <Link href={`/admin/recover/${businessId}`}>Manage campaign →</Link>
-        </p>
-        {!business.recover_activated_at && <ActivateButton businessId={businessId} product="recover" />}
-      </section>
+        <section>
+          <h2>Recover {business.recover_activated_at ? "· Active" : "· Not activated"}</h2>
+          <table className="table">
+            <tbody>
+              <tr>
+                <td >Opportunities identified</td>
+                <td>{recover.identified}</td>
+              </tr>
+              <tr>
+                <td >Contacted</td>
+                <td>{recover.contacted}</td>
+              </tr>
+              <tr>
+                <td >Revenue recovered</td>
+                <td >{formatNaira(recover.revenueRecovered)}</td>
+              </tr>
+            </tbody>
+          </table>
+          <p>
+            <Link href={`/admin/recover/${businessId}`}>Manage campaign →</Link>
+          </p>
+          {!business.recover_activated_at && <ActivateButton businessId={businessId} product="recover" />}
+        </section>
 
-      <section >
-        <h2>Prevent {business.prevent_activated_at ? "· Active" : "· Not activated"}</h2>
-        <table className="table">
-          <tbody>
-            <tr>
-              <td >Enquiries received</td>
-              <td>{prevent.enquiriesReceived}</td>
-            </tr>
-            <tr>
-              <td >Enquiries answered</td>
-              <td>{prevent.enquiriesAnswered}</td>
-            </tr>
-            <tr>
-              <td >Human handoffs</td>
-              <td>{prevent.humanHandoffs}</td>
-            </tr>
-            <tr>
-              <td >Approved knowledge items</td>
-              <td>{knowledgeCount ?? 0}</td>
-            </tr>
-          </tbody>
-        </table>
-        <p>
-          <Link href={`/admin/prevent/${businessId}`}>View conversations →</Link> ·{" "}
-          <Link href={`/admin/prevent/${businessId}/knowledge`}>Manage approved knowledge →</Link>
-        </p>
-        {!business.prevent_activated_at && <ActivateButton businessId={businessId} product="prevent" />}
-      </section>
+        <section>
+          <h2>Prevent {business.prevent_activated_at ? "· Active" : "· Not activated"}</h2>
+          <table className="table">
+            <tbody>
+              <tr>
+                <td >Enquiries received</td>
+                <td>{prevent.enquiriesReceived}</td>
+              </tr>
+              <tr>
+                <td >Enquiries answered</td>
+                <td>{prevent.enquiriesAnswered}</td>
+              </tr>
+              <tr>
+                <td >Human handoffs</td>
+                <td>{prevent.humanHandoffs}</td>
+              </tr>
+              <tr>
+                <td >Approved knowledge items</td>
+                <td>{knowledgeCount ?? 0}</td>
+              </tr>
+            </tbody>
+          </table>
+          <p>
+            <Link href={`/admin/prevent/${businessId}`}>View conversations →</Link> ·{" "}
+            <Link href={`/admin/prevent/${businessId}/knowledge`}>Manage approved knowledge →</Link>
+          </p>
+          {!business.prevent_activated_at && <ActivateButton businessId={businessId} product="prevent" />}
+        </section>
+      </div>
 
       <section style={{ paddingTop: "var(--s6)", borderTop: "1px solid var(--rule)" }}>
         <h2>Incremental Revenue Influenced by Capture</h2>

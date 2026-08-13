@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { after } from "next/server";
+import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { generateRevenueLeakReport } from "@/lib/report/generate";
 import { SiteNav, SiteFooter } from "@/components/SiteChrome";
@@ -93,6 +94,16 @@ export default async function ReportPage({
   const report = generateRevenueLeakReport(conversations, opportunities ?? []);
   const stillAnalysing = report.classifiedConversations < report.totalConversations;
   const leaks = Object.entries(report.leakageCounts).filter(([, count]) => count > 0);
+
+  // A signed-in business owner can genuinely land on their own report link
+  // (it's the same token used everywhere else). Asking them to "create a
+  // free account" when they already have one was a real dead end a founder
+  // caught directly — check the session on the authenticated client
+  // (separate from the service-role client used for the report data above)
+  // so the next-step CTA can route them straight to their dashboard instead.
+  const authClient = await createClient();
+  const { data: authClaims } = await authClient.auth.getClaims();
+  const isSignedIn = Boolean(authClaims?.claims);
 
   return (
     <div className="page">
@@ -190,9 +201,10 @@ export default async function ReportPage({
             {/* -------------------------------------------- examples ----- */}
             {report.examples.length > 0 && (
               <section className="report__block">
-                <h2 className="h3">Examples</h2>
+                <h2 className="h3">Examples from your conversations</h2>
                 <p className="meta" style={{ marginTop: "var(--s2)" }}>
-                  Anonymised — no customer names or contact details.
+                  Real excerpts from {business.name}&apos;s own conversations — anonymised, no
+                  customer names or contact details.
                 </p>
                 <ul className="flow" style={{ marginTop: "var(--s5)" }}>
                   {report.examples.map((ex) => (
@@ -221,14 +233,16 @@ export default async function ReportPage({
                 This report is the diagnosis. What would help most right now?
               </p>
               <div style={{ marginTop: "var(--s5)" }}>
-                <InterestForm token={token} />
+                <InterestForm token={token} isSignedIn={isSignedIn} />
               </div>
-              <p className="meta" style={{ marginTop: "var(--s6)" }}>
-                <Link href={`/signup?claim=${token}`} className="link">
-                  Create your free account
-                </Link>{" "}
-                to track recovery progress and set up automated responses.
-              </p>
+              {!isSignedIn && (
+                <p className="meta" style={{ marginTop: "var(--s6)" }}>
+                  <Link href={`/signup?claim=${token}`} className="link">
+                    Create your free account
+                  </Link>{" "}
+                  to track recovery progress and set up automated responses.
+                </p>
+              )}
             </section>
           </div>
         </div>

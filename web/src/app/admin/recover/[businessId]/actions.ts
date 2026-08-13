@@ -10,6 +10,8 @@ import {
   isTerminal,
   type OpportunityForRules,
 } from "@/lib/recover/rules";
+import { generateOutreachDraft } from "@/lib/recover/draft-message";
+import { mapWithConcurrency } from "@/lib/concurrency";
 
 // All actions here run through the AUTHENTICATED server client, same as
 // /admin itself — RLS (platform_admins / business_members) governs access,
@@ -19,32 +21,82 @@ import {
 
 export type ActionResult = { ok: boolean; message: string };
 
+// Bounded — an AI call per opportunity, same rate-limit-cliff reasoning as
+// upload/[token]/actions.ts's classification pool (TESTS.md DEV-7).
+const DRAFT_CONCURRENCY = 5;
+
 // PRD §12 workflow: Identify -> Score -> Determine timing -> (send). We
 // stop at "queued" — see src/lib/recover/rules.ts's header comment and
 // OUTSTANDINGS.md for why: outbound WhatsApp send is blocked on DEP-1/DEP-2,
 // so a human executes the actual contact and the app tracks state around it.
+// As of 2026-08-13, "queued" now includes an AI-drafted message per
+// opportunity (not just scheduling metadata) — a founder caught that
+// campaigns previously only surfaced opportunities without ever drafting
+// anything a human could actually send.
 export async function startCampaign(businessId: string): Promise<ActionResult> {
   const supabase = await createClient();
 
-  const { data: opportunities, error } = await supabase
-    .from("opportunities")
-    .select("id, type, intent, estimated_value, status, source_conversation_id")
-    .eq("business_id", businessId);
+  const [{ data: business }, { data: opportunities, error }] = await Promise.all([
+    supabase.from("businesses").select("name").eq("id", businessId).maybeSingle(),
+    supabase
+      .from("opportunities")
+      .select("id, type, intent, estimated_value, status, source_conversation_id")
+      .eq("business_id", businessId),
+  ]);
 
   if (error) return { ok: false, message: "Could not load opportunities." };
+  if (!business) return { ok: false, message: "Could not load business — check you have access." };
 
   const { data: conversations } = await supabase
     .from("conversations")
-    .select("id, last_message_at")
+    .select("id, last_message_at, leakage_type")
     .eq("business_id", businessId);
   const lastMessageById = new Map((conversations ?? []).map((c) => [c.id, c.last_message_at]));
+  const leakageTypeById = new Map((conversations ?? []).map((c) => [c.id, c.leakage_type]));
 
   const eligible = (opportunities ?? []).filter((o) => isEligibleForCampaign(o));
   if (eligible.length === 0) {
     return { ok: false, message: "No eligible opportunities to queue — all have already been actioned." };
   }
 
+  const conversationIds = eligible
+    .map((o) => o.source_conversation_id)
+    .filter((id): id is string => id !== null);
+  const { data: messages } = conversationIds.length
+    ? await supabase
+        .from("messages")
+        .select("conversation_id, sender_type, body, sent_at")
+        .in("conversation_id", conversationIds)
+        .order("sent_at", { ascending: true })
+    : { data: [] as { conversation_id: string; sender_type: string; body: string | null; sent_at: string }[] };
+  const messagesByConversation = new Map<string, { sender_type: string; body: string | null }[]>();
+  for (const m of messages ?? []) {
+    const list = messagesByConversation.get(m.conversation_id) ?? [];
+    list.push({ sender_type: m.sender_type, body: m.body });
+    messagesByConversation.set(m.conversation_id, list);
+  }
+
   const maxValue = Math.max(0, ...opportunities!.map((o) => o.estimated_value ?? 0));
+
+  // Draft generation isolated per-opportunity, same as classification
+  // (TESTS.md DEV-7) — one bad/slow model call must not stop the rest of
+  // the batch from queuing. A failed draft leaves draft_message null; the
+  // opportunity is still queued and usable, just without a suggested message.
+  const draftByOpportunity = new Map<string, string | null>();
+  await mapWithConcurrency(eligible, DRAFT_CONCURRENCY, async (o) => {
+    const convMessages = o.source_conversation_id ? messagesByConversation.get(o.source_conversation_id) : undefined;
+    if (!convMessages || convMessages.length === 0) return;
+    try {
+      const draft = await generateOutreachDraft({
+        businessName: business.name,
+        leakageType: (o.source_conversation_id ? leakageTypeById.get(o.source_conversation_id) : null) ?? "other",
+        messages: convMessages,
+      });
+      draftByOpportunity.set(o.id, draft);
+    } catch (err) {
+      console.error(`Draft generation failed for opportunity ${o.id}:`, err);
+    }
+  });
 
   const rows = eligible.map((o) => {
     const forRules: OpportunityForRules = {
@@ -66,6 +118,7 @@ export async function startCampaign(businessId: string): Promise<ActionResult> {
       action: `priority_score=${score}`,
       status: "pending" as const,
       scheduled_at: scheduledAt.toISOString(),
+      draft_message: draftByOpportunity.get(o.id) ?? null,
     };
   });
 
@@ -73,7 +126,11 @@ export async function startCampaign(businessId: string): Promise<ActionResult> {
   if (insertError) return { ok: false, message: "Could not queue the campaign." };
 
   revalidatePath(`/admin/recover/${businessId}`);
-  return { ok: true, message: `Queued ${rows.length} opportunity/opportunities for recovery outreach.` };
+  const draftedCount = rows.filter((r) => r.draft_message).length;
+  return {
+    ok: true,
+    message: `Queued ${rows.length} opportunit${rows.length === 1 ? "y" : "ies"} for recovery outreach — ${draftedCount} with a suggested message ready below.`,
+  };
 }
 
 // A human has actually messaged the customer via WhatsApp themselves.

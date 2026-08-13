@@ -1238,6 +1238,34 @@ select.input {
   margin-top: var(--s4);
 }
 
+/* Dashboard's Find/Recover/Prevent sections previously stacked in one
+   narrow column at every viewport width — correct on mobile, but read as
+   "optimized for mobile" on desktop (a founder's own words) since it left
+   most of a wide screen empty. Widens to a 2-up grid once there's room for
+   it; the summary cards are short enough that 3-up would feel cramped
+   before ~1200px, so this stops at 2 columns rather than forcing 3. */
+.app-page .app-grid {
+  display: grid;
+  gap: var(--s7);
+}
+
+@media (min-width: 860px) {
+  .app-page .app-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  /* Find naturally has less content than Recover/Prevent's stat tables —
+     let it span the full width above the other two rather than leaving an
+     awkward half-empty cell beside it. */
+  .app-page .app-grid > :first-child {
+    grid-column: 1 / -1;
+  }
+}
+
+.app-page .app-grid > section {
+  margin-top: 0;
+}
+
 /* ---------------------------------------------------------------- prose -- */
 
 /* The global reset zeroes every margin, so long-form copy needs its rhythm

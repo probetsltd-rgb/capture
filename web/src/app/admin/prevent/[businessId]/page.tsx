@@ -90,6 +90,7 @@ export default async function PreventPage({
 
       <section>
         <h2>Conversations</h2>
+        <div className="table__scroll">
         <table className="table">
           <thead>
             <tr >
@@ -123,6 +124,7 @@ export default async function PreventPage({
             )}
           </tbody>
         </table>
+        </div>
       </section>
     </main>
   );
