@@ -31,6 +31,11 @@ export default async function AdminPage() {
           in <code>platform_admins</code> / <code>business_members</code> — RLS denies by default,
           not an error.
         </p>
+        <p>
+          Looking for your own business instead of the admin view?{" "}
+          <Link href="/dashboard">Go to your dashboard</Link> — it will guide you through setup if
+          you don&apos;t have one yet.
+        </p>
       </main>
     );
   }

@@ -315,3 +315,16 @@ Founder-requested follow-up to `DEV-9`'s finding that production was now too dis
 | 2026-08-13 | Test data cleanup | ops | N/A | No test businesses created in this round — migration and seed work only, on projects with no real customer-facing traffic yet for `capture-dev`, and no destructive operations against `capture-db`. |
 
 **Still open, logged in `OUTSTANDINGS.md`**: `SUPABASE_SERVICE_ROLE_KEY`/`SUPABASE_SECRET_KEY`/`SUPABASE_JWT_SECRET` for Preview/Development scope and local `.env.local` still hold `capture-db`'s (production's) values, not `capture-dev`'s — not retrievable via the Supabase MCP connection, which deliberately doesn't expose secret keys. Waiting on the founder to supply `capture-dev`'s actual values from its dashboard.
+
+---
+
+## /admin Dead End for Non-Admin Accounts (DEV-11)
+
+Founder used a stale test link (`next=/admin`, left over from `DEV-9`'s auth debugging) with `founder-personal@example.com` — a real, working account, but not a `platform_admin` — and landed on `/admin`'s empty state with no way forward, reading as "sign-in exists but there's nowhere to sign up." `/signup` was already live and correctly linked from `/login`; the actual gap was narrower.
+
+| Date | Test | Type | Result | Notes |
+|---|---|---|---|---|
+| 2026-08-13 | Confirmed `/signup` and `/login`'s "Create an account" link both already work | manual | Pass | `curl` on `/signup` returns 200; not the actual gap. |
+| 2026-08-13 | `/admin`'s empty state given a link out for non-admin accounts | e2e | Pass | Added a `/dashboard` link to the existing RLS-explainer empty state — `/dashboard` already redirects anyone without a business straight to `/onboarding` (existing, correct logic), so this reuses it rather than duplicating onboarding logic on `/admin`. Verified with a real generated magic link for `founder-personal@example.com` (`redirectTo` including `next=%2Fadmin`, reproducing the founder's exact scenario) against production: landed on `/admin`, new "Go to your dashboard" copy present, clicking it redirected to `/onboarding` as expected. |
+| 2026-08-13 | `tsc --noEmit` | build | Pass | Zero errors. |
+| 2026-08-13 | Test data cleanup | ops | N/A | No test rows created — verification used the founder's own real (if secondary) `founder-personal@example.com` account, at their own suggestion in an earlier round. Scratch verification script deleted after use. |
