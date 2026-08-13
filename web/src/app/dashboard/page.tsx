@@ -26,7 +26,14 @@ export default async function DashboardPage() {
 
   const userId = claims.claims.sub as string;
   const businessId = await getOwnBusinessId(supabase, userId);
-  if (!businessId) redirect("/onboarding");
+  if (!businessId) {
+    // A platform_admin legitimately owns no business — funnelling that
+    // account into "set up your business" onboarding was a real bug a
+    // founder caught directly, using their own admin account. Only a
+    // genuine business-less user should land on /onboarding.
+    const { data: isAdmin } = await supabase.rpc("am_platform_admin");
+    redirect(isAdmin ? "/admin" : "/onboarding");
+  }
 
   const { data: business } = await supabase
     .from("businesses")
