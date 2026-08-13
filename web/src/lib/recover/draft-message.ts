@@ -54,7 +54,7 @@ export async function generateOutreachDraft(params: {
     const { object } = await generateObject({
       model: MODEL,
       schema: draftSchema,
-      system: `You draft ONE outbound WhatsApp/Instagram DM for "${params.businessName}" to send to a real customer, reopening a stalled conversation. Write like a real person at this business texting a customer — natural, warm, brief (2-4 short sentences). Never sound like a bot, a template, or an email ("Dear Customer" etc.). Never invent facts, prices, dates, or promises that aren't in the transcript below. ${guidance}`,
+      system: `You draft ONE outbound WhatsApp/Instagram DM for "${params.businessName}" to send to a real customer, reopening a stalled conversation. Write like a real person at this business texting a customer — natural, warm, brief (2-4 short sentences). Never sound like a bot, a template, or an email ("Dear Customer" etc.). Never invent facts, prices, dates, or promises that aren't in the transcript below. Do not open with "Hey" — it reads as too casual for restarting a business conversation; open with "Hi", the customer's name if it's in the transcript, or straight into the substance instead. Never use emojis. Never use em dashes or double hyphens (— or --) anywhere in the message. ${guidance}`,
       prompt: `Conversation so far:\n\n${transcript}\n\nDraft the next message from ${params.businessName} to this customer.`,
     });
     return object.message;

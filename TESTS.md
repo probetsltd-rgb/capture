@@ -350,3 +350,15 @@ Nine issues from the founder's own manual usage in one batch — a real mix of U
 | 2026-08-13 | A hook flagged `generateObject` as "removed in AI SDK v6" while writing `draft-message.ts` | investigation | False positive, not followed | The already-live, already-tested `classify.ts` uses the identical `generateObject`/`NoObjectGeneratedError` import from `ai@^7.0.58` (confirmed via `grep` + `package.json`). `tsc --noEmit` on the new file was clean using the same pattern. Trusted the working, deployed code in this repo over the hook's generic version-mismatch claim rather than migrating to `generateText` + `Output.object()` for no real reason. |
 | 2026-08-13 | `tsc --noEmit`, `next build` | build | Pass | Zero errors both times (checked once mid-round, once again after the mobile table-scroll fix). |
 | 2026-08-13 | Test data cleanup | ops | Pass | Test business (`TEST — UI verification`, with two customers/conversations/opportunities seeded to test the cold-for feature) and its throwaway auth user deleted via service-role client after verification. Confirmed post-cleanup: `businesses` contains only the 3 `SIMULATED —` fixtures and the founder's own real `Rentit` rows. |
+
+---
+
+## Draft-Message Tone Fix (DEV-13)
+
+Founder feedback on the actual `DEV-12` draft output: "Hey" is not a good way to reopen a business conversation, and avoid double hyphens and emojis — the latter two are well-known AI-generated-text tells the rest of this app's copy has always deliberately avoided (see the frontend-design pass earlier this session).
+
+| Date | Test | Type | Result | Notes |
+|---|---|---|---|---|
+| 2026-08-14 | `generateOutreachDraft`'s system prompt updated: no "Hey" opener, no emojis, no em dashes/double hyphens | e2e (real AI Gateway) | Pass | Added explicit negative instructions plus a positive alternative ("Hi", the customer's name if present, or straight into the substance). Verified against real production AI Gateway calls, not just prompt-reading: seeded a test business with three different leakage-type scenarios (`abandoned_high_intent`, `quote_not_followed_up`, `no_response`) and ran a real campaign start. All three generated messages opened cleanly ("Hi there, just wanted to follow up...", "Hi, wanted to follow up...", "Sorry for the delay getting back to you..."), no emojis, no em dashes/double hyphens anywhere, and each still correctly matched its scenario's tone guidance (the `no_response` one appropriately opened by acknowledging the delay). |
+| 2026-08-14 | Same `generateObject`-removed-in-v6 hook false positive recurred, not followed again | investigation | Confirmed false positive | Same reasoning as `DEV-12`'s entry — `tsc --noEmit` clean, pattern matches the already-deployed `classify.ts`. |
+| 2026-08-14 | Test data cleanup | ops | Pass | Test business (`TEST — prompt verify`) and its throwaway auth user deleted via service-role client after verification. |
