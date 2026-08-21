@@ -105,6 +105,9 @@ export default async function AdminPage() {
     <main className="shell app-page">
       <h1>Capture — Admin</h1>
       <p>Signed in as {claims?.claims.email ?? "unknown"}.</p>
+      <p className="meta">
+        <Link href="/admin/plans">Manage Engage plans/pricing →</Link>
+      </p>
 
       <section style={{ margin: "2rem 0" }}>
         <h2>Find funnel</h2>

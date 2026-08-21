@@ -7,8 +7,10 @@ import { computePreventSummary } from "@/lib/prevent/summary";
 import { computeNorthStar } from "@/lib/report/north-star";
 import { getInstagramConnectionStatus } from "@/lib/channels/instagram";
 import { generateRevenueLeakReport } from "@/lib/report/generate";
+import { checkBillingGate } from "@/lib/prevent/process";
 import { ActivateButton } from "./ActivateButton";
 import { DisconnectInstagramButton } from "./DisconnectInstagramButton";
+import { EngagePaywall } from "./EngagePaywall";
 
 const LEAK_LABELS: Record<string, string> = {
   no_response: "Unanswered enquiries",
@@ -58,7 +60,7 @@ export default async function DashboardPage({
   const { data: business } = await supabase
     .from("businesses")
     .select(
-      "id, name, industry, upload_token, onboarded_at, recover_activated_at, prevent_activated_at",
+      "id, name, industry, upload_token, onboarded_at, recover_activated_at, prevent_activated_at, plan_status, trial_started_at, trial_ends_at, current_period_end",
     )
     .eq("id", businessId)
     .maybeSingle();
@@ -70,6 +72,8 @@ export default async function DashboardPage({
     { data: findConversations },
     { data: preventConversations },
     { count: knowledgeCount },
+    { count: pendingKnowledgeCount },
+    { data: plans },
     instagramConnection,
   ] = await Promise.all([
     supabase.from("opportunities").select("status, actual_revenue").eq("business_id", businessId),
@@ -88,8 +92,29 @@ export default async function DashboardPage({
       .select("id", { count: "exact", head: true })
       .eq("business_id", businessId)
       .not("approved_at", "is", null),
+    // Includes items seeded from the 30-day Instagram history (2026-08-21)
+    // as well as brochure/manual-entry items awaiting review — the CTA
+    // below doesn't need to distinguish the source, just that review work
+    // is waiting.
+    supabase
+      .from("knowledge_items")
+      .select("id", { count: "exact", head: true })
+      .eq("business_id", businessId)
+      .is("approved_at", null),
+    supabase.from("plans").select("id, display_name, price_kobo, message_limit, escalation_notification_limit, has_analytics"),
     getInstagramConnectionStatus(businessId),
   ]);
+
+  // Founder request 2026-08-21 (pay-to-continue billing) — same gate
+  // function lib/prevent/process.ts actually enforces, reused here so the
+  // dashboard never shows a stale/different picture from what's really
+  // blocking Engage.
+  const billingGateReason = checkBillingGate({
+    planStatus: business.plan_status,
+    trialStartedAt: business.trial_started_at,
+    trialEndsAt: business.trial_ends_at,
+    currentPeriodEnd: business.current_period_end,
+  });
 
   // 30-day baseline (Capture_PRD_Addendum_v2.md §16) — real API-ingested
   // conversations only, never the manual-export history, so this reflects
@@ -227,6 +252,13 @@ export default async function DashboardPage({
             Average response time isn&apos;t measured yet — that&apos;s a known gap, not omitted by accident.
             {baseline.hasAnyValueEstimate && " Estimated opportunity value is not a revenue guarantee."}
           </p>
+          {(pendingKnowledgeCount ?? 0) > 0 && (
+            <p className="notice notice--ok" style={{ marginTop: "var(--s3)" }}>
+              We drafted {pendingKnowledgeCount} knowledge item{pendingKnowledgeCount === 1 ? "" : "s"} from what you
+              already told customers in these conversations —{" "}
+              <Link href="/dashboard/engage/knowledge">review and approve them →</Link>
+            </p>
+          )}
         </section>
       )}
 
@@ -271,6 +303,20 @@ export default async function DashboardPage({
 
         <section>
           <h2>Engage {business.prevent_activated_at ? "· Active" : "· Not activated"}</h2>
+          {business.prevent_activated_at && billingGateReason && (
+            <EngagePaywall
+              businessId={businessId}
+              reason={billingGateReason}
+              plans={(plans ?? []).map((p) => ({
+                id: p.id,
+                displayName: p.display_name,
+                priceKobo: p.price_kobo,
+                messageLimit: p.message_limit,
+                escalationNotificationLimit: p.escalation_notification_limit,
+                hasAnalytics: p.has_analytics,
+              }))}
+            />
+          )}
           <table className="table">
             <tbody>
               <tr>

@@ -3,6 +3,8 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { encryptToken, decryptToken } from "./token-crypto";
 import { fetchConversationList, fetchConversationMessages } from "./instagram-api";
 import { classifyAndScoreConversations, type CreatedConversation } from "@/lib/ingest/classify-and-score";
+import { extractKnowledgeItems } from "@/lib/ingest/brochure-extract";
+import { redactPii } from "@/lib/classification/redact";
 
 // channel_connections has zero RLS policies for `authenticated` — see the
 // migration's header comment. All reads/writes go through the service-role
@@ -197,7 +199,7 @@ export async function fetchHistoricalMessages(businessId: string): Promise<{ con
 
   const { data: business } = await supabase
     .from("businesses")
-    .select("avg_transaction_value")
+    .select("avg_transaction_value, knowledge_base_seeded_at")
     .eq("id", businessId)
     .maybeSingle();
 
@@ -323,7 +325,55 @@ export async function fetchHistoricalMessages(businessId: string): Promise<{ con
     createdConversations,
   );
 
+  // Founder request 2026-08-21: a business shouldn't start Engage from a
+  // blank knowledge base when 30 days of their own real replies are
+  // sitting right here. One-time per business (guarded by
+  // knowledge_base_seeded_at) so a reconnect/re-fetch doesn't re-suggest
+  // the same items again.
+  if (!business?.knowledge_base_seeded_at) {
+    await seedKnowledgeFromHistory(supabase, businessId, createdConversations);
+  }
+
   return { conversationsImported: createdConversations.length };
+}
+
+async function seedKnowledgeFromHistory(
+  supabase: ReturnType<typeof createServiceRoleClient>,
+  businessId: string,
+  createdConversations: CreatedConversation[],
+): Promise<void> {
+  // Only the business's own replies are candidate knowledge — customer
+  // messages are questions/requests, not facts about the business.
+  const businessReplies = createdConversations
+    .flatMap((c) => c.messages)
+    .filter((m) => m.sender_type === "business" && m.body && m.body.trim().length > 0)
+    .map((m) => redactPii(m.body as string));
+
+  // Mark seeded regardless of outcome (including "no replies found") —
+  // this is a one-time-per-business operation, not a retry-until-success
+  // one, otherwise every future historical fetch would keep re-attempting
+  // it for a business that simply has few historical replies.
+  if (businessReplies.length === 0) {
+    await supabase.from("businesses").update({ knowledge_base_seeded_at: new Date().toISOString() }).eq("id", businessId);
+    return;
+  }
+
+  const items = await extractKnowledgeItems(businessReplies.join("\n\n"), "conversation_history");
+
+  if (items && items.length > 0) {
+    await supabase.from("knowledge_items").insert(
+      items.map((item) => ({
+        business_id: businessId,
+        category: item.category,
+        question: null,
+        content: item.content,
+        media_url: null,
+        approved_at: null, // pending review, same as brochure/manual items
+      })),
+    );
+  }
+
+  await supabase.from("businesses").update({ knowledge_base_seeded_at: new Date().toISOString() }).eq("id", businessId);
 }
 
 // PLANS.md Phase 5.2 — live inbound message routing. Unlike every other

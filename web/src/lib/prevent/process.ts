@@ -29,6 +29,105 @@ function isHumanActive(status: { state: string | null; humanTakenAt: string | nu
   return status.state === "human_handling" || status.humanTakenAt !== null;
 }
 
+// Founder request 2026-08-21: real Engage billing (Paystack), pay-to-
+// continue at trial end. A business activated *before* this migration has
+// `trial_started_at === null` — grandfathered in, never gated here, since
+// nobody asked for an existing real customer to be retroactively paywalled
+// (the founder can backfill trial dates manually if that's ever wanted).
+// This never touches whether a conversation escalates for safety reasons —
+// it only decides whether the AI is allowed to run at all.
+export type BillingStatus = {
+  planStatus: string | null;
+  trialStartedAt: string | null;
+  trialEndsAt: string | null;
+  currentPeriodEnd: string | null;
+};
+
+// Exported so the dashboard paywall (app/dashboard/page.tsx) can render the
+// exact same gate decision the real enforcement point uses, instead of a
+// second hand-rolled copy of this logic that could quietly drift from it.
+export function checkBillingGate(business: BillingStatus, now: Date = new Date()): string | null {
+  if (!business.trialStartedAt) return null;
+
+  if (business.planStatus === "active") {
+    // Paystack's own recurring charge is the primary renewal mechanism;
+    // this is only a safety net for a webhook that never arrived.
+    if (business.currentPeriodEnd && new Date(business.currentPeriodEnd) < now) {
+      return "Your subscription period has ended and hasn't renewed yet.";
+    }
+    return null;
+  }
+
+  if (business.trialEndsAt && new Date(business.trialEndsAt) < now) {
+    return "Your Engage trial has ended — choose a plan to continue.";
+  }
+  return null;
+}
+
+// A rolling approximation of "this billing period" — current_period_end
+// minus one month — used only while trialing/plan-less callers never reach
+// here (both gates below are skipped entirely unless plan_status is
+// "active"). Good enough for a monthly cap; doesn't need to be exact to
+// the day, since a business's own current_period_end is itself already an
+// approximation (see the webhook's period-end-setting comment).
+function currentPeriodStart(currentPeriodEnd: string | null): Date {
+  const end = currentPeriodEnd ? new Date(currentPeriodEnd) : new Date();
+  return new Date(end.getTime() - 30 * 24 * 60 * 60 * 1000);
+}
+
+// Message-limit enforcement only applies to an active paid plan — trial
+// messaging is deliberately uncapped (PLANS.md 5.6: trial is meant to let
+// a business fully experience Engage, not a rationed preview).
+async function checkMessageLimitGate(
+  supabase: SupabaseClient,
+  businessId: string,
+  planId: string | null,
+  currentPeriodEnd: string | null,
+): Promise<string | null> {
+  if (!planId) return null;
+
+  const { data: plan } = await supabase.from("plans").select("message_limit").eq("id", planId).maybeSingle();
+  if (!plan?.message_limit) return null; // null = unlimited
+
+  const { count } = await supabase
+    .from("messages")
+    .select("id", { count: "exact", head: true })
+    .eq("business_id", businessId)
+    .eq("sender_type", "ai")
+    .gte("sent_at", currentPeriodStart(currentPeriodEnd).toISOString());
+
+  if ((count ?? 0) >= plan.message_limit) {
+    return `Monthly message limit (${plan.message_limit}) reached for this billing period.`;
+  }
+  return null;
+}
+
+// Founder instruction 2026-08-21: this cap gates notification *volume*
+// only — a conversation the AI can't safely answer always escalates
+// (state: human_required, always dashboard-visible) regardless of this
+// check. This only decides whether that escalation also sends an active
+// email/WhatsApp ping. Uncapped during trial, same reasoning as the
+// message limit above.
+async function isEscalationNotificationAllowed(
+  supabase: SupabaseClient,
+  businessId: string,
+  planId: string | null,
+  currentPeriodEnd: string | null,
+): Promise<boolean> {
+  if (!planId) return true;
+
+  const { data: plan } = await supabase.from("plans").select("escalation_notification_limit").eq("id", planId).maybeSingle();
+  if (!plan) return true;
+
+  const { count } = await supabase
+    .from("escalation_notifications")
+    .select("id", { count: "exact", head: true })
+    .eq("business_id", businessId)
+    .gte("sent_at", currentPeriodStart(currentPeriodEnd).toISOString());
+
+  return (count ?? 0) < plan.escalation_notification_limit;
+}
+
 // PRD §17D: merge newly-extracted fields onto the conversation, never
 // clobbering a previously-captured value with a null from a later message
 // that simply didn't repeat it.
@@ -49,7 +148,8 @@ async function mergeQualification(
 export type InboundResult =
   | { status: "responded"; response: string; mediaUrl: string | null }
   | { status: "escalated"; reason: string }
-  | { status: "suppressed_human_active" };
+  | { status: "suppressed_human_active" }
+  | { status: "billing_gated"; reason: string };
 
 export async function handleInboundMessage(
   supabase: SupabaseClient,
@@ -109,12 +209,57 @@ export async function handleInboundMessage(
       .not("approved_at", "is", null),
     supabase
       .from("businesses")
-      .select("name, escalation_keywords, knowledge_base_confirmed_complete_at")
+      .select(
+        "name, escalation_keywords, knowledge_base_confirmed_complete_at, plan_id, plan_status, trial_started_at, trial_ends_at, current_period_end",
+      )
       .eq("id", businessId)
       .maybeSingle(),
   ]);
   const extraEscalationKeywords = (business?.escalation_keywords as string[] | null) ?? [];
   const knowledgeBaseConfirmedCompleteAt = (business?.knowledge_base_confirmed_complete_at as string | null) ?? null;
+
+  const billingGateReason = business
+    ? checkBillingGate({
+        planStatus: business.plan_status as string | null,
+        trialStartedAt: business.trial_started_at as string | null,
+        trialEndsAt: business.trial_ends_at as string | null,
+        currentPeriodEnd: business.current_period_end as string | null,
+      })
+    : null;
+  // Message is already stored (above) — a billing gate (trial expired,
+  // subscription lapsed, or the message-limit cap below) never loses a
+  // real customer message, only stops the AI from responding. Flagged for
+  // a human via the same human_required visibility the dashboard already
+  // renders, tagged so it reads distinctly from a genuine safety
+  // escalation. Deliberately does NOT call sendEscalationNotification or
+  // count against escalation_notifications — this isn't a safety
+  // escalation, and must never compete with or be throttled by that tier
+  // limit. If the conversation already carries a real safety
+  // escalation_reason, that takes precedence and is left untouched.
+  async function applyBillingGate(reason: string): Promise<InboundResult> {
+    await supabase
+      .from("conversations")
+      .update(
+        wasAlreadyEscalated
+          ? { state: "human_required" }
+          : { state: "human_required", escalation_reason: `Billing: ${reason}` },
+      )
+      .eq("id", conversationId);
+    return { status: "billing_gated", reason };
+  }
+
+  if (billingGateReason) return applyBillingGate(billingGateReason);
+
+  const messageLimitReason =
+    business?.plan_status === "active"
+      ? await checkMessageLimitGate(
+          supabase,
+          businessId,
+          (business.plan_id as string | null) ?? null,
+          (business.current_period_end as string | null) ?? null,
+        )
+      : null;
+  if (messageLimitReason) return applyBillingGate(messageLimitReason);
 
   await supabase.from("conversations").update({ state: "ai_handling" }).eq("id", conversationId);
 
@@ -184,13 +329,30 @@ export async function handleInboundMessage(
     const { data: customer } = conv?.customer_id
       ? await supabase.from("customers").select("name").eq("id", conv.customer_id).maybeSingle()
       : { data: null };
-    await sendEscalationNotification({
-      businessId,
-      businessName: (business?.name as string | null) ?? "Your business",
-      customerName: (customer?.name as string | null) ?? null,
-      escalationReason: reason,
-      conversationUrl: `${getSiteUrl()}/dashboard/engage`,
-    });
+
+    // Founder instruction 2026-08-21: this only caps whether a notification
+    // is *sent* — the escalation above already happened and is already
+    // dashboard-visible regardless of this check. Uncapped during trial.
+    const notificationAllowed =
+      business?.plan_status === "active"
+        ? await isEscalationNotificationAllowed(
+            supabase,
+            businessId,
+            (business.plan_id as string | null) ?? null,
+            (business.current_period_end as string | null) ?? null,
+          )
+        : true;
+
+    if (notificationAllowed) {
+      await sendEscalationNotification({
+        businessId,
+        businessName: (business?.name as string | null) ?? "Your business",
+        customerName: (customer?.name as string | null) ?? null,
+        escalationReason: reason,
+        conversationUrl: `${getSiteUrl()}/dashboard/engage`,
+      });
+      await supabase.from("escalation_notifications").insert({ business_id: businessId, conversation_id: conversationId });
+    }
 
     return { status: "escalated", reason };
   }

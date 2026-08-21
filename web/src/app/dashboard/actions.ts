@@ -1,10 +1,13 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getOwnBusinessId } from "@/lib/business-membership";
 import { MAX_AUTOMATIONS_PER_OPPORTUNITY } from "@/lib/recover/rules";
 import { disconnectInstagram, deleteInstagramData, resetInstagramConversationHistory } from "@/lib/channels/instagram";
+import { initializeTransaction } from "@/lib/payments/paystack";
+import { getSiteUrl } from "@/lib/site-url";
 
 // All actions here run through the AUTHENTICATED client — RLS
 // (business_members/platform_admins) governs access, same discipline as
@@ -40,11 +43,23 @@ export async function activateProduct(businessId: string, product: "recover" | "
   }
 
   const column = product === "recover" ? "recover_activated_at" : "prevent_activated_at";
-  const { data, error } = await supabase
-    .from("businesses")
-    .update({ [column]: new Date().toISOString() })
-    .eq("id", businessId)
-    .select("id");
+  const now = new Date();
+  const update: Record<string, string> = { [column]: now.toISOString() };
+
+  // Founder request 2026-08-21: Engage's trial clock starts here, not at
+  // signup — a business may sign up long before it's ready to actually
+  // turn Engage on. trial_days lives in app_settings (admin-editable, not
+  // hardcoded) so the trial length can be tuned without a redeploy.
+  if (product === "prevent") {
+    const { data: setting } = await supabase.from("app_settings").select("value").eq("key", "trial_days").maybeSingle();
+    const trialDays = Number(setting?.value ?? 7);
+    const trialEnds = new Date(now.getTime() + trialDays * 24 * 60 * 60 * 1000);
+    update.trial_started_at = now.toISOString();
+    update.trial_ends_at = trialEnds.toISOString();
+    update.plan_status = "trialing";
+  }
+
+  const { data, error } = await supabase.from("businesses").update(update).eq("id", businessId).select("id");
 
   if (error) return { ok: false, message: "Could not activate. Please try again." };
   if (!data || data.length === 0) {
@@ -198,4 +213,55 @@ export async function resetInstagramConversationHistoryAction(businessId: string
     ok: true,
     message: `Reset. Removed ${result.customersDeleted} customer${result.customersDeleted === 1 ? "" : "s"} and all associated conversations/messages. Instagram connection untouched.`,
   };
+}
+
+// Founder request 2026-08-21: pay-to-continue billing for Engage. Starts a
+// real Paystack checkout for the chosen plan and redirects there — this
+// throws Next's internal redirect signal on success, so a normal return
+// only ever happens on failure. Real activation is never granted here or
+// on the callback below; only the webhook (api/webhooks/paystack/route.ts)
+// flips businesses.plan_status, since that's the only party that has
+// actually confirmed payment succeeded.
+export async function startSubscription(businessId: string, planId: string): Promise<ActionResult> {
+  const supabase = await createClient();
+
+  const { data: business } = await supabase
+    .from("businesses")
+    .select("contact_email")
+    .eq("id", businessId)
+    .maybeSingle();
+  if (!business) return { ok: false, message: "Could not start checkout — check you have access to this business." };
+
+  const { data: claims } = await supabase.auth.getClaims();
+  const userEmail = claims?.claims?.email as string | undefined;
+  const email = business.contact_email || userEmail;
+  if (!email) {
+    return { ok: false, message: "No email on file to send the receipt to — add a contact email in Settings first." };
+  }
+
+  const { data: plan } = await supabase
+    .from("plans")
+    .select("price_kobo, paystack_plan_code")
+    .eq("id", planId)
+    .maybeSingle();
+  if (!plan?.paystack_plan_code) {
+    return { ok: false, message: "This plan isn't fully set up yet — please contact us to subscribe." };
+  }
+
+  let authorizationUrl: string;
+  try {
+    const result = await initializeTransaction({
+      email,
+      amountKobo: plan.price_kobo,
+      planCode: plan.paystack_plan_code,
+      callbackUrl: `${getSiteUrl()}/dashboard/billing/callback`,
+      metadata: { business_id: businessId },
+    });
+    authorizationUrl = result.authorizationUrl;
+  } catch (error) {
+    console.error("Paystack initialize-transaction failed", error);
+    return { ok: false, message: "Could not start checkout — please try again." };
+  }
+
+  redirect(authorizationUrl);
 }

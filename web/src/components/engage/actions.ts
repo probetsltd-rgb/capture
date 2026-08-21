@@ -131,6 +131,7 @@ export async function simulateInboundMessage(
     };
   }
   if (result.status === "escalated") return { ok: true, message: `Escalated: ${result.reason}` };
+  if (result.status === "billing_gated") return { ok: true, message: `Billing: ${result.reason}` };
   return { ok: true, message: "Suppressed — a human is already handling this conversation." };
 }
 
