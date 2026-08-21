@@ -146,6 +146,16 @@ textarea {
   color: var(--paper);
 }
 
+/* A quiet second tone, not a second theme — same warm off-white already
+   used for card-level surfaces elsewhere (--paper-2), applied to a whole
+   band. Founder-caught 2026-08-21: every section after the dark "problem"
+   band read as one long, undifferentiated white run. Alternated across the
+   remaining sections rather than flipping just one, so the rhythm reads as
+   a deliberate pattern rather than a stray inconsistency. */
+.band--tint {
+  background: var(--paper-2);
+}
+
 .band--ink .lede,
 .band--ink .meta {
   color: #a6acb4;
@@ -631,24 +641,50 @@ textarea {
   margin-top: auto;
 }
 
-.footer__inner {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--s5);
+.footer__grid {
+  display: grid;
+  gap: var(--s6);
+  grid-template-columns: minmax(0, 1fr);
 }
 
-.footer__links {
+@media (min-width: 700px) {
+  .footer__grid {
+    /* Brand column gets more room than the three link columns — it carries
+       the tagline's full line length, they're each a short vertical list. */
+    grid-template-columns: minmax(0, 1.4fr) repeat(3, minmax(0, 1fr));
+  }
+}
+
+.footer__col {
   display: flex;
-  flex-wrap: wrap;
-  gap: var(--s5);
+  flex-direction: column;
+  gap: var(--s3);
+}
+
+/* Same mono/uppercase/tracked vocabulary as .step's section markers —
+   a column heading is a structural label, not prose, same category of
+   thing. */
+.footer__col-title {
+  font-family: var(--font-mono-stack);
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.footer__col a {
   font-size: 0.875rem;
   color: var(--ink-2);
 }
 
-.footer__links a:hover {
+.footer__col a:hover {
   color: var(--ink);
+}
+
+.footer__bottom {
+  border-top: 1px solid var(--rule);
+  margin-top: var(--s7);
+  padding-top: var(--s5);
 }
 
 /* ---------------------------------------------------------------- forms -- */

@@ -10,6 +10,10 @@ web/out/
 .vercel/
 web/.vercel/
 
+# supabase CLI local link-state cache
+.temp/
+supabase/.temp/
+
 # env files — never commit secrets
 .env
 .env.*

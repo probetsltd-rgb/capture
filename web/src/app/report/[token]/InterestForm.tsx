@@ -7,7 +7,7 @@ import { captureInterest, type InterestState } from "./actions";
 const initialState: InterestState = { status: "idle", message: null };
 
 // Self-serve first (PRD's whole premise): someone who just checked "Recover"
-// or "Prevent" is at peak intent and should land straight in the product,
+// or "Engage" is at peak intent and should land straight in the product,
 // not on a passive "we'll be in touch" — that was a real dead end a founder
 // caught in production, since nothing here ever actually reached out. The
 // interest flags are still recorded server-side (captureInterest) as an
@@ -19,9 +19,9 @@ export function InterestForm({ token, isSignedIn }: { token: string; isSignedIn:
 
   if (state.status === "success") {
     const label = state.wantsRecover && state.wantsPrevent
-      ? "Recover and Prevent"
+      ? "Recover and Engage"
       : state.wantsPrevent
-        ? "Prevent"
+        ? "Engage"
         : "Recover";
     return (
       <div className="stack">
@@ -51,7 +51,7 @@ export function InterestForm({ token, isSignedIn }: { token: string; isSignedIn:
       <label className="checkbox">
         <input type="checkbox" name="prevent" />
         <span>
-          <strong style={{ color: "var(--ink)", fontWeight: 500 }}>Prevent</strong> — stop new
+          <strong style={{ color: "var(--ink)", fontWeight: 500 }}>Engage</strong> — stop new
           enquiries going cold from here on.
         </span>
       </label>

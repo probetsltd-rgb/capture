@@ -2,7 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { getOwnBusinessId } from "@/lib/business-membership";
 import { MAX_AUTOMATIONS_PER_OPPORTUNITY } from "@/lib/recover/rules";
+import { disconnectInstagram, deleteInstagramData, resetInstagramConversationHistory } from "@/lib/channels/instagram";
 
 // All actions here run through the AUTHENTICATED client — RLS
 // (business_members/platform_admins) governs access, same discipline as
@@ -125,4 +127,75 @@ export async function updateRules(
 
   revalidatePath("/dashboard/settings");
   return { ok: true, message: "Rules updated." };
+}
+
+// channel_connections has zero RLS policies for `authenticated` (see its
+// migration) — ownership has to be verified explicitly here, unlike every
+// other action in this file, before calling the service-role-backed
+// disconnectInstagram(). A founder-caught gap (2026-08-15): the dashboard
+// had a "Connect Instagram" link but nothing to reconnect or disconnect
+// once already connected.
+export async function disconnectInstagramAction(businessId: string): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { data: claims } = await supabase.auth.getClaims();
+  if (!claims?.claims) return { ok: false, message: "Not signed in." };
+
+  const userId = claims.claims.sub as string;
+  const ownBusinessId = await getOwnBusinessId(supabase, userId);
+  if (!ownBusinessId || ownBusinessId !== businessId) {
+    return { ok: false, message: "Could not disconnect — check you have access to this business." };
+  }
+
+  await disconnectInstagram(businessId);
+  revalidatePath("/dashboard");
+  return { ok: true, message: "Instagram disconnected." };
+}
+
+// Meta Data Deletion Instructions requirement (META_APP_REVIEW.md §5) —
+// deliberately separate from disconnectInstagramAction above: disconnect is
+// reversible (reconnect picks up where you left off), this is not. Same
+// ownership-check discipline (channel_connections/customers have no
+// authenticated-role RLS policies, so this must be verified explicitly
+// before calling the service-role-backed deleteInstagramData()).
+export async function deleteInstagramDataAction(businessId: string): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { data: claims } = await supabase.auth.getClaims();
+  if (!claims?.claims) return { ok: false, message: "Not signed in." };
+
+  const userId = claims.claims.sub as string;
+  const ownBusinessId = await getOwnBusinessId(supabase, userId);
+  if (!ownBusinessId || ownBusinessId !== businessId) {
+    return { ok: false, message: "Could not delete — check you have access to this business." };
+  }
+
+  const result = await deleteInstagramData(businessId, userId);
+  revalidatePath("/dashboard");
+  return {
+    ok: true,
+    message: `Deleted. Removed ${result.customersDeleted} customer${result.customersDeleted === 1 ? "" : "s"} and all associated Instagram conversations, messages, and the stored connection.`,
+  };
+}
+
+// Narrower than deleteInstagramDataAction above — clears conversation
+// history for a fresh demo/screencast without disconnecting Instagram, so
+// the connection doesn't need to be redone afterward. See
+// resetInstagramConversationHistory()'s own comment for why this is kept
+// distinct from the Meta-compliance deletion action rather than a flag on it.
+export async function resetInstagramConversationHistoryAction(businessId: string): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { data: claims } = await supabase.auth.getClaims();
+  if (!claims?.claims) return { ok: false, message: "Not signed in." };
+
+  const userId = claims.claims.sub as string;
+  const ownBusinessId = await getOwnBusinessId(supabase, userId);
+  if (!ownBusinessId || ownBusinessId !== businessId) {
+    return { ok: false, message: "Could not reset — check you have access to this business." };
+  }
+
+  const result = await resetInstagramConversationHistory(businessId, userId);
+  revalidatePath("/dashboard");
+  return {
+    ok: true,
+    message: `Reset. Removed ${result.customersDeleted} customer${result.customersDeleted === 1 ? "" : "s"} and all associated conversations/messages. Instagram connection untouched.`,
+  };
 }

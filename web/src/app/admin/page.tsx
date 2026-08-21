@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { computeNorthStar } from "@/lib/report/north-star";
 
@@ -13,6 +14,18 @@ import { computeNorthStar } from "@/lib/report/north-star";
 export default async function AdminPage() {
   const supabase = await createClient();
   const { data: claims } = await supabase.auth.getClaims();
+
+  // The RLS-scoped empty state below (businesses.length === 0) is safe but
+  // was confusing: a real, non-admin business owner landing on /admin saw
+  // their own one-row business list rendered through the full admin
+  // dashboard, complete with platform-wide North Star and Find-funnel
+  // stats. Gate the route explicitly instead of relying on RLS scoping
+  // alone — same am_platform_admin() RPC and redirect-to-/dashboard
+  // pattern already used in the reverse direction on dashboard/page.tsx.
+  const { data: isAdmin } = await supabase.rpc("am_platform_admin");
+  if (!isAdmin) {
+    redirect("/dashboard");
+  }
 
   const { data: businesses } = await supabase
     .from("businesses")
@@ -52,12 +65,17 @@ export default async function AdminPage() {
       : Promise.resolve({ data: [] as { status: string; actual_revenue: number | null }[] }),
   ]);
 
-  // "Messages handled" counts Prevent conversations only — the uploaded Find
-  // history is messages the business handled itself before Capture existed.
-  // See lib/report/north-star.ts.
+  // "Messages handled" counts Prevent/Engage conversations only — the
+  // uploaded Find history is messages the business handled itself before
+  // Capture existed. See lib/report/north-star.ts. instagram_api added
+  // 2026-08-15 — this filter previously silently excluded real, live
+  // Instagram data from the platform-wide North Star number, same bug
+  // found and fixed the same day on /dashboard and /admin/prevent/[id].
   const realBusinessIdSet = new Set(realBusinessIds);
   const preventConvIds = (conversations ?? [])
-    .filter((c) => c.source === "whatsapp_api" && realBusinessIdSet.has(c.business_id))
+    .filter(
+      (c) => (c.source === "whatsapp_api" || c.source === "instagram_api") && realBusinessIdSet.has(c.business_id),
+    )
     .map((c) => c.id);
   const { count: handledMessagesCount } = preventConvIds.length
     ? await supabase.from("messages").select("id", { count: "exact", head: true }).in("conversation_id", preventConvIds)
@@ -176,7 +194,7 @@ export default async function AdminPage() {
           <tbody>
             {businesses.map((b) => {
               const counts = conversationCounts.get(b.id) ?? { total: 0, classified: 0 };
-              const interests = [b.interested_in_recover && "Recover", b.interested_in_prevent && "Prevent"]
+              const interests = [b.interested_in_recover && "Recover", b.interested_in_prevent && "Engage"]
                 .filter(Boolean)
                 .join(", ");
               return (
@@ -193,7 +211,7 @@ export default async function AdminPage() {
                   <td >{interests || "—"}</td>
                   <td >
                     <Link href={`/admin/recover/${b.id}`}>Recover →</Link>{" "}
-                    <Link href={`/admin/prevent/${b.id}`}>Prevent →</Link>
+                    <Link href={`/admin/engage/${b.id}`}>Engage →</Link>
                   </td>
                 </tr>
               );

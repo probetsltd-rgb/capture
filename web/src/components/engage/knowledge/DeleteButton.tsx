@@ -13,7 +13,7 @@ export function DeleteButton({ businessId, itemId }: { businessId: string; itemI
           await deleteKnowledgeItem(businessId, itemId);
         })
       }
-      
+
     >
       Delete
     </button>

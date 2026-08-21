@@ -17,7 +17,7 @@ export function ApproveButton({ businessId, itemId }: { businessId: string; item
             setError(result.ok ? null : result.message);
           })
         }
-        
+
       >
         {pending ? "Approving…" : "Approve"}
       </button>

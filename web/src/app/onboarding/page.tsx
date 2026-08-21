@@ -61,7 +61,7 @@ export default async function OnboardingPage({
   return (
     <main className="shell app-page">
       <h1>Set up your business</h1>
-      <p>A few details, then we&apos;ll get your Recover/Prevent workspace ready.</p>
+      <p>A few details, then we&apos;ll get your Recover/Engage workspace ready.</p>
       <OnboardingForm />
     </main>
   );

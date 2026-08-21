@@ -5,9 +5,9 @@ import { simulateInboundMessage, type SimulateResult } from "./actions";
 
 const initialState: SimulateResult = { ok: true, message: "" };
 
-// Stand-in for a live WhatsApp/Instagram webhook (blocked on DEP-1/DEP-2/
-// DEP-4 — see OUTSTANDINGS.md). Drives the exact same engine code a real
-// webhook handler would call.
+// Stand-in for a live WhatsApp webhook (blocked on DEP-1/DEP-2 — see
+// OUTSTANDINGS.md). Instagram has a real webhook now (Phase 5.2); this
+// remains useful for WhatsApp and for testing without a real message.
 export function SimulateForm({ businessId }: { businessId: string }) {
   const action = simulateInboundMessage.bind(null, businessId);
   const [state, formAction, pending] = useActionState(action, initialState);

@@ -13,17 +13,25 @@ import {
 import { generateOutreachDraft } from "@/lib/recover/draft-message";
 import { mapWithConcurrency } from "@/lib/concurrency";
 
-// All actions here run through the AUTHENTICATED server client, same as
-// /admin itself — RLS (platform_admins / business_members) governs access,
-// not an implicit "this is an admin route" assumption. A non-admin calling
-// these gets zero rows back and every write silently affects nothing,
-// exactly like the rest of the app.
+// Moved 2026-08-15 from app/admin/recover/[businessId]/actions.ts as part
+// of the route restructure (PLANS.md Phase 5.0) — now the one canonical
+// copy, reachable from both /admin/recover/[businessId] (founder) and
+// /dashboard/recover (business owner, no businessId in the URL). All
+// actions here run through the AUTHENTICATED server client — RLS
+// (platform_admins / business_members) governs access, not an implicit
+// "this is an admin route" assumption. A non-member calling these gets
+// zero rows back and every write silently affects nothing.
 
 export type ActionResult = { ok: boolean; message: string };
 
 // Bounded — an AI call per opportunity, same rate-limit-cliff reasoning as
 // upload/[token]/actions.ts's classification pool (TESTS.md DEV-7).
 const DRAFT_CONCURRENCY = 5;
+
+function revalidateRecoverPaths(businessId: string) {
+  revalidatePath(`/admin/recover/${businessId}`);
+  revalidatePath("/dashboard/recover");
+}
 
 // PRD §12 workflow: Identify -> Score -> Determine timing -> (send). We
 // stop at "queued" — see src/lib/recover/rules.ts's header comment and
@@ -125,7 +133,7 @@ export async function startCampaign(businessId: string): Promise<ActionResult> {
   const { error: insertError } = await supabase.from("automations").insert(rows);
   if (insertError) return { ok: false, message: "Could not queue the campaign." };
 
-  revalidatePath(`/admin/recover/${businessId}`);
+  revalidateRecoverPaths(businessId);
   const draftedCount = rows.filter((r) => r.draft_message).length;
   return {
     ok: true,
@@ -197,7 +205,7 @@ export async function markContacted(opportunityId: string, businessId: string): 
   }
 
   await supabase.from("opportunities").update({ status: "contacted" }).eq("id", opportunityId);
-  revalidatePath(`/admin/recover/${businessId}`);
+  revalidateRecoverPaths(businessId);
   return { ok: true, message: "Marked as contacted." };
 }
 
@@ -214,7 +222,7 @@ export async function markResponded(opportunityId: string, businessId: string): 
     .eq("status", "pending");
 
   await supabase.from("opportunities").update({ status: "responded" }).eq("id", opportunityId);
-  revalidatePath(`/admin/recover/${businessId}`);
+  revalidateRecoverPaths(businessId);
   return { ok: true, message: "Marked as responded. Automation stopped for this opportunity." };
 }
 
@@ -241,6 +249,6 @@ export async function recordOutcome(
 
   if (error) return { ok: false, message: "Could not record the outcome." };
 
-  revalidatePath(`/admin/recover/${businessId}`);
+  revalidateRecoverPaths(businessId);
   return { ok: true, message: "Outcome recorded." };
 }

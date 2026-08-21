@@ -23,7 +23,7 @@ const mono = IBM_Plex_Mono({
 export const metadata: Metadata = {
   title: "Capture — Turn more demand into revenue",
   description:
-    "Capture helps established businesses find revenue they're leaving on the table, recover dormant opportunities, and prevent new enquiries from going cold.",
+    "Capture helps established businesses find revenue they're leaving on the table, recover dormant opportunities, and respond to new enquiries instantly before they go cold.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

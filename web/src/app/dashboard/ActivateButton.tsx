@@ -9,14 +9,18 @@ import { activateProduct } from "./actions";
 // of what it actually does, which a founder caught directly ("doesn't give
 // enough context"). This states the real mechanics honestly instead of
 // inventing pricing that doesn't exist.
+// The "prevent" key is the internal identifier (matches businesses.prevent_activated_at
+// and the "product" param elsewhere) — not renamed, per AD-9's decision to
+// avoid DB/internal churn with zero customer-visible benefit. Only the
+// display label changed to "Engage".
 const PRODUCT_INFO: Record<"recover" | "prevent", { label: string; explainer: string }> = {
   recover: {
     label: "Recover",
     explainer:
-      "Unlocks the campaign manager at /admin/recover — you'll see every opportunity from your report, prioritised, with suggested timing. You send the outreach yourself for now (no automated WhatsApp sending yet); Capture tracks status and enforces the one-follow-up-max limit. No cost during your pilot.",
+      "Unlocks the campaign manager at /dashboard/recover — you'll see every opportunity from your report, prioritised, with suggested timing. You send the outreach yourself for now (no automated WhatsApp sending yet); Capture tracks status and enforces the one-follow-up-max limit. No cost during your pilot.",
   },
   prevent: {
-    label: "Prevent",
+    label: "Engage",
     explainer:
       "Turns on AI responses to new enquiries, answering only from knowledge you've explicitly approved — it will never guess or improvise. Anything outside that knowledge, or anything sensitive, hands off to a human. No cost during your pilot.",
   },

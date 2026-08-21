@@ -7,6 +7,14 @@ import { handleInboundMessage, takeConversation, type InboundResult } from "@/li
 
 export type SimulateResult = { ok: boolean; message: string };
 
+// Moved 2026-08-15 from app/admin/prevent/[businessId]/actions.ts as part of
+// the route restructure (PLANS.md Phase 5.0) — this is now the one
+// canonical copy, reachable from both /admin/engage/[businessId] (founder)
+// and /dashboard/engage (business owner, no businessId in the URL). Every
+// write revalidates both possible paths unconditionally rather than
+// threading a "which route called this" parameter through every action —
+// simpler, and the cost of revalidating an unused path is negligible.
+
 // This action drives a real, paid model call. Since Phase 4 opened
 // self-service signup, it is reachable by anyone who can receive a magic
 // link — not just the founder — so it needs the same abuse controls as any
@@ -15,12 +23,16 @@ export type SimulateResult = { ok: boolean; message: string };
 const MAX_MESSAGE_LENGTH = 2000;
 const SIMULATE_RATE_LIMIT = { max: 30, windowMinutes: 60 };
 
-// Stand-in for the live WhatsApp/Instagram webhook, which doesn't exist
-// yet (Phase 1.4b blocked on DEP-1/DEP-2/DEP-4). This is the same pattern
-// as Phase 1.4a's file upload substituting for a live API — it drives the
-// exact same handleInboundMessage() code path that a real webhook handler
-// would call, so the engine/kill-switch/escalation logic is tested for
-// real, not mocked.
+function revalidateEngagePaths(businessId: string) {
+  revalidatePath(`/admin/engage/${businessId}`);
+  revalidatePath("/dashboard/engage");
+}
+
+// Stand-in for the live WhatsApp webhook, which doesn't exist yet (blocked
+// on DEP-1/DEP-2). Instagram now has a real webhook (Phase 5.2) — this
+// remains useful for WhatsApp and for testing without a real customer
+// message. Drives the exact same handleInboundMessage() code path a real
+// webhook handler calls.
 export async function simulateInboundMessage(
   businessId: string,
   _prevState: SimulateResult,
@@ -108,9 +120,16 @@ export async function simulateInboundMessage(
 
   const result: InboundResult = await handleInboundMessage(supabase, businessId, conversationId, messageBody);
 
-  revalidatePath(`/admin/prevent/${businessId}`);
+  revalidateEngagePaths(businessId);
 
-  if (result.status === "responded") return { ok: true, message: "AI responded from approved knowledge." };
+  if (result.status === "responded") {
+    return {
+      ok: true,
+      message: result.mediaUrl
+        ? "AI responded from approved knowledge, with a media attachment."
+        : "AI responded from approved knowledge.",
+    };
+  }
   if (result.status === "escalated") return { ok: true, message: `Escalated: ${result.reason}` };
   return { ok: true, message: "Suppressed — a human is already handling this conversation." };
 }
@@ -119,13 +138,13 @@ export async function markTakeConversation(businessId: string, conversationId: s
   if (!assignedTo.trim()) return { ok: false, message: "Enter who is taking this conversation." };
   const supabase = await createClient();
   await takeConversation(supabase, conversationId, assignedTo.trim());
-  revalidatePath(`/admin/prevent/${businessId}`);
+  revalidateEngagePaths(businessId);
   return { ok: true, message: "Conversation taken — AI will not respond further." };
 }
 
 export async function closeConversation(businessId: string, conversationId: string): Promise<SimulateResult> {
   const supabase = await createClient();
   await supabase.from("conversations").update({ state: "closed" }).eq("id", conversationId);
-  revalidatePath(`/admin/prevent/${businessId}`);
+  revalidateEngagePaths(businessId);
   return { ok: true, message: "Closed." };
 }

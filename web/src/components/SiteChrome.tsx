@@ -37,14 +37,14 @@ export function SiteNav() {
         </Link>
 
         <nav className="nav__links" aria-label="Primary">
+          <Link className="nav__link" href="/#how-it-works">
+            How it works
+          </Link>
           <Link className="nav__link" href="/#find">
             Find
           </Link>
           <Link className="nav__link" href="/#recover">
             Recover
-          </Link>
-          <Link className="nav__link" href="/#prevent">
-            Prevent
           </Link>
         </nav>
 
@@ -52,8 +52,8 @@ export function SiteNav() {
           <Link href={signedIn ? "/dashboard" : "/login"} className="nav__link">
             {signedIn ? "Dashboard" : "Sign in"}
           </Link>
-          <Link href="/find" className="btn btn--primary">
-            Run a free audit
+          <Link href="/signup" className="btn btn--primary">
+            Try Engage Free
           </Link>
         </div>
       </div>
@@ -63,21 +63,46 @@ export function SiteNav() {
 
 export function SiteFooter() {
   const signedIn = useSignedIn();
+  const year = new Date().getFullYear();
 
   return (
     <footer className="footer">
-      <div className="shell footer__inner">
-        <div>
-          <div className="nav__brand">Capture</div>
-          <p className="meta" style={{ marginTop: "var(--s1)" }}>
-            Turn more demand into revenue.
+      <div className="shell">
+        <div className="footer__grid">
+          <div>
+            <div className="nav__brand">Capture</div>
+            <p className="meta" style={{ marginTop: "var(--s2)", maxWidth: "34ch" }}>
+              Capture helps businesses find revenue they&apos;re leaving on the table, recover
+              dormant leads, and respond to new enquiries instantly — across WhatsApp and Instagram.
+            </p>
+          </div>
+
+          <nav className="footer__col" aria-label="Product">
+            <div className="footer__col-title">Product</div>
+            <Link href="/find">Find</Link>
+            <Link href="/#recover">Recover</Link>
+            <Link href="/#how-it-works">Engage</Link>
+          </nav>
+
+          <nav className="footer__col" aria-label="Account">
+            <div className="footer__col-title">Account</div>
+            <Link href={signedIn ? "/dashboard" : "/login"}>{signedIn ? "Dashboard" : "Sign in"}</Link>
+            <Link href="/signup">Try Engage Free</Link>
+          </nav>
+
+          <nav className="footer__col" aria-label="Legal">
+            <div className="footer__col-title">Legal</div>
+            <Link href="/privacy">Terms &amp; Privacy</Link>
+            <Link href="/data-deletion">Data Deletion Instructions</Link>
+          </nav>
+        </div>
+
+        <div className="footer__bottom">
+          <p className="meta">
+            &copy; {year} Techvantage Web Assets Ltd. All rights reserved. Capture is a product of
+            Techvantage Web Assets Ltd.
           </p>
         </div>
-        <nav className="footer__links" aria-label="Footer">
-          <Link href="/find">Run a free audit</Link>
-          <Link href={signedIn ? "/dashboard" : "/login"}>{signedIn ? "Dashboard" : "Sign in"}</Link>
-          <Link href="/privacy">Privacy &amp; data handling</Link>
-        </nav>
       </div>
     </footer>
   );

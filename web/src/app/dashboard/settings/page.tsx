@@ -4,6 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getOwnBusinessId } from "@/lib/business-membership";
 import { MAX_AUTOMATIONS_PER_OPPORTUNITY } from "@/lib/recover/rules";
 import { RulesForm } from "./RulesForm";
+import { DeleteInstagramDataButton } from "../DeleteInstagramDataButton";
+import { ResetConversationHistoryButton } from "../ResetConversationHistoryButton";
 
 export default async function DashboardSettingsPage() {
   const supabase = await createClient();
@@ -34,6 +36,19 @@ export default async function DashboardSettingsPage() {
         escalationKeywords={(business.escalation_keywords as string[] | null) ?? []}
         platformMaxRecoverFollowups={MAX_AUTOMATIONS_PER_OPPORTUNITY}
       />
+
+      <section style={{ marginTop: "var(--s8)" }}>
+        <h2>Data &amp; privacy</h2>
+        <p className="meta">
+          See our <Link href="/privacy">Terms &amp; Privacy</Link> for how Capture handles your data. To
+          delete everything Capture has stored from your connected Instagram account specifically:
+        </p>
+        <DeleteInstagramDataButton businessId={businessId} />
+        <p className="meta" style={{ marginTop: "var(--s5)" }}>
+          Preparing a demo and want to clear conversation history without disconnecting Instagram?
+        </p>
+        <ResetConversationHistoryButton businessId={businessId} />
+      </section>
     </main>
   );
 }
