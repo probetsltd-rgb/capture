@@ -2,6 +2,11 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { computeNorthStar } from "@/lib/report/north-star";
+import { describePlanStatus } from "@/lib/billing/describe";
+
+function formatNaira(kobo: number): string {
+  return `₦${Math.round(kobo / 100).toLocaleString("en-NG")}`;
+}
 
 // Deliberately queries via the authenticated server client, NOT the
 // service-role client used elsewhere in this app for public/token-gated
@@ -30,7 +35,7 @@ export default async function AdminPage() {
   const { data: businesses } = await supabase
     .from("businesses")
     .select(
-      "id, name, industry, created_at, report_viewed_at, interested_in_recover, interested_in_prevent, is_simulated",
+      "id, name, industry, created_at, report_viewed_at, interested_in_recover, interested_in_prevent, is_simulated, plan_id, plan_status, trial_started_at, trial_ends_at, current_period_end",
     )
     .order("created_at", { ascending: false });
 
@@ -58,12 +63,26 @@ export default async function AdminPage() {
   // (OUTSTANDINGS.md DEV-1) are excluded so a founder can't mistake fixture
   // data for real influenced revenue.
   const realBusinessIds = businesses.filter((b) => !b.is_simulated).map((b) => b.id);
-  const [{ data: conversations }, { data: allOpportunities }] = await Promise.all([
+  const [{ data: conversations }, { data: allOpportunities }, { data: plans }] = await Promise.all([
     supabase.from("conversations").select("id, business_id, classified_at, source").in("business_id", businessIds),
     realBusinessIds.length
       ? supabase.from("opportunities").select("status, actual_revenue").in("business_id", realBusinessIds)
       : Promise.resolve({ data: [] as { status: string; actual_revenue: number | null }[] }),
+    supabase.from("plans").select("id, display_name, price_kobo"),
   ]);
+
+  // Founder request 2026-08-21 ("unable to see who is on free tier,
+  // subscription to a particular plan etc") — Engage subscription revenue
+  // is a real, separate money stream from North Star's Recover/Find
+  // revenue-influenced metric above, and had zero visibility anywhere in
+  // admin until now.
+  const planById = new Map((plans ?? []).map((p) => [p.id, p]));
+  const realBusinesses = businesses.filter((b) => !b.is_simulated);
+  const trialingCount = realBusinesses.filter((b) => b.plan_status === "trialing").length;
+  const activeBusinesses = realBusinesses.filter((b) => b.plan_status === "active");
+  const pastDueCount = realBusinesses.filter((b) => b.plan_status === "past_due").length;
+  const canceledCount = realBusinesses.filter((b) => b.plan_status === "canceled").length;
+  const mrrKobo = activeBusinesses.reduce((sum, b) => sum + (planById.get(b.plan_id ?? "")?.price_kobo ?? 0), 0);
 
   // "Messages handled" counts Prevent/Engage conversations only — the
   // uploaded Find history is messages the business handled itself before
@@ -178,6 +197,35 @@ export default async function AdminPage() {
         </table>
       </section>
 
+      <section style={{ margin: "2rem 0" }}>
+        <h2>Engage Billing</h2>
+        <p className="meta">Real (non-simulated) businesses only. A separate revenue stream from North Star above.</p>
+        <table className="table">
+          <tbody>
+            <tr>
+              <td>MRR (active subscriptions)</td>
+              <td className="mono">{formatNaira(mrrKobo)}</td>
+            </tr>
+            <tr>
+              <td>Active subscribers</td>
+              <td>{activeBusinesses.length}</td>
+            </tr>
+            <tr>
+              <td>Trialing</td>
+              <td>{trialingCount}</td>
+            </tr>
+            <tr>
+              <td>Past due</td>
+              <td>{pastDueCount}</td>
+            </tr>
+            <tr>
+              <td>Canceled</td>
+              <td>{canceledCount}</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
       <section>
         <h2>Businesses</h2>
         <div className="table__scroll">
@@ -186,6 +234,7 @@ export default async function AdminPage() {
             <tr >
               <th >Business</th>
               <th >Industry</th>
+              <th >Plan</th>
               <th >Created</th>
               <th >Conversations</th>
               <th >Classified</th>
@@ -200,6 +249,15 @@ export default async function AdminPage() {
               const interests = [b.interested_in_recover && "Recover", b.interested_in_prevent && "Engage"]
                 .filter(Boolean)
                 .join(", ");
+              const planLabel = describePlanStatus(
+                {
+                  planStatus: b.plan_status,
+                  trialStartedAt: b.trial_started_at,
+                  trialEndsAt: b.trial_ends_at,
+                  currentPeriodEnd: b.current_period_end,
+                },
+                planById.get(b.plan_id ?? "")?.display_name ?? null,
+              );
               return (
                 <tr key={b.id} >
                   <td >
@@ -207,6 +265,7 @@ export default async function AdminPage() {
                     {b.is_simulated && <span className="meta"> (simulated)</span>}
                   </td>
                   <td >{b.industry ?? "—"}</td>
+                  <td >{planLabel}</td>
                   <td >{new Date(b.created_at).toLocaleDateString()}</td>
                   <td >{counts.total}</td>
                   <td >{counts.classified}</td>

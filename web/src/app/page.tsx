@@ -27,14 +27,14 @@ export default function Home() {
         <section className="band">
           <div className="shell hero">
             <div className="hero__copy">
-              <h1 className="display">Stop letting customer enquiries go cold.</h1>
+              <h1 className="display">Stop losing money from delayed DM responses.</h1>
               <p className="lede" style={{ marginTop: "var(--s5)" }}>
                 We respond instantly, qualify enquiries and follow up — while keeping your team in
                 the loop for anything that needs a person.
               </p>
               <div className="row" style={{ marginTop: "var(--s6)", gap: "var(--s4)" }}>
                 <Link href="/signup" className="btn btn--primary">
-                  Try Engage Free
+                  Try Free
                 </Link>
                 <a href="#how-it-works" className="btn btn--secondary">
                   See how Engage works
@@ -81,16 +81,15 @@ export default function Home() {
               <span className="step__line" />
             </div>
             <h2 className="h2" data-reveal>
-              One conversation, six real steps.
+              One conversation, five real steps.
             </h2>
 
             <ol className="flow" data-reveal data-reveal-delay="80" style={{ marginTop: "var(--s6)", maxWidth: "60ch" }}>
               <FlowStep n="01" label="Respond" note="Answered immediately, from information you've explicitly approved — never a guess." />
               <FlowStep n="02" label="Qualify" note="Name, product, timing captured as the conversation naturally gives them up." />
-              <FlowStep n="03" label="Follow up" note="A quiet conversation gets one appropriate nudge, never a blast." />
-              <FlowStep n="04" label="Escalate" note="Anything sensitive — price negotiation, a complaint, an unusual request — goes straight to a human." />
-              <FlowStep n="05" label="Progress" note="Every conversation has a state: handled, waiting on your team, or closed." tone="dormant" />
-              <FlowStep n="06" label="Measure" note="What came in, what got answered, what needed a person — as real numbers, not a vibe." tone="realised" />
+              <FlowStep n="03" label="Escalate" note="Anything sensitive — price negotiation, a complaint, an unusual request — goes straight to a human." />
+              <FlowStep n="04" label="Progress" note="Every conversation has a state: handled, waiting on your team, or closed." tone="dormant" />
+              <FlowStep n="05" label="Measure" note="What came in, what got answered, what needed a person — as real numbers, not a vibe." tone="realised" />
             </ol>
           </div>
         </section>
@@ -118,7 +117,7 @@ export default function Home() {
               <h2 className="h2">See it work before you commit to it.</h2>
               <p className="body" style={{ marginTop: "var(--s4)" }}>
                 Connect Instagram and Engage builds a baseline from your last 30 days — real
-                conversations, real response times, real gaps. Five days into your trial, you get a
+                conversations, real gaps, not a guess. Five days into your trial, you get a
                 progress report comparing what changed.
               </p>
               <p className="body" style={{ marginTop: "var(--s4)" }}>
@@ -216,7 +215,7 @@ export default function Home() {
         {/* ------------------------------------------------------- cta --- */}
         <section className="band band--ruled band--tint">
           <div className="shell cta" data-reveal>
-            <h2 className="h2">Stop letting enquiries go cold.</h2>
+            <h2 className="h2">Stop losing money from delayed DM responses.</h2>
             <p className="lede" style={{ marginTop: "var(--s4)" }}>
               Try Engage free for 7 days.
             </p>

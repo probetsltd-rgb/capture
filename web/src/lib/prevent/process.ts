@@ -70,7 +70,10 @@ export function checkBillingGate(business: BillingStatus, now: Date = new Date()
 // "active"). Good enough for a monthly cap; doesn't need to be exact to
 // the day, since a business's own current_period_end is itself already an
 // approximation (see the webhook's period-end-setting comment).
-function currentPeriodStart(currentPeriodEnd: string | null): Date {
+// Exported so admin's per-business billing detail (2026-08-21) can show
+// "this period's usage" against the exact same window the enforcement
+// gates actually use, instead of a second approximation that could drift.
+export function currentPeriodStart(currentPeriodEnd: string | null): Date {
   const end = currentPeriodEnd ? new Date(currentPeriodEnd) : new Date();
   return new Date(end.getTime() - 30 * 24 * 60 * 60 * 1000);
 }

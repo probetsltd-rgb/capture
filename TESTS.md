@@ -880,3 +880,18 @@ Full plan: `/Users/seunabimbola/.claude/plans/mutable-wobbling-iverson.md`. Scop
 **Still open, blocking real end-to-end use** (not deploy-blocking — the code fails safely without these): `PAYSTACK_SECRET_KEY` needs adding via `vercel env add` (never pasted in chat), real Paystack Plan objects need creating with their codes entered into `/admin/plans` (Subscribe fails gracefully with a clear message until then), and Paystack's dashboard webhook URL needs pointing at `/api/webhooks/paystack`. Real Paystack test-mode checkout end-to-end has not been run — blocked on the secret key.
 
 **Follow-up, same day: price/checkout-amount sync.** Founder asked whether `/admin/plans`' comparison table is what actually gets charged versus a separately-configured Paystack Plan — a real gap: checkout is driven by `paystack_plan_code`, and Paystack's API invalidates a passed `amount` whenever a `plan` code is present, so our own `price_kobo` and the linked Paystack Plan's amount are two independent numbers that could silently diverge. Confirmed Paystack's `PUT /plan/:id_or_code` endpoint against current docs (body: `amount`, `update_existing_subscriptions` — the latter defaults `true` on Paystack's side, deliberately overridden to `false` here so a price edit never silently reprices an already-subscribed customer). `updatePlan` now calls this endpoint first; if it fails, the DB row isn't saved either, so the two values can never drift apart. No new migration, `tsc`/`next build` clean, deployed (`dpl_DQQ38D9PxRArPDswk3dUhCFtmRDj`), health check passed.
+
+## Admin Billing Visibility (DEV-23)
+
+Founder request: "admin doesn't seem well optimized to fully understand the business, unable to see who is on free tier, subscription to a particular plan etc." Presented three prioritized recommendations via chat (Plan column on the Businesses table, an Engage Billing summary section, per-business billing detail) before writing any code, per explicit instruction; founder confirmed all three ("build 1-3").
+
+| Date | Test | Type | Result | Notes |
+|---|---|---|---|---|
+| 2026-08-21 | `tsc --noEmit` after each piece (`describe.ts`, `admin/page.tsx`, `admin/engage/[businessId]/page.tsx`) | build | Pass | Clean throughout. |
+| 2026-08-21 | `eslint` on all four changed/added files | static | Pass | 0 errors. |
+| 2026-08-21 | Real `next build` | build | Pass | Full route table unchanged in shape (no new routes added — same three existing admin pages, extended). |
+| 2026-08-21 | Caught and fixed before shipping: nested `<main>` landmark | code inspection | Fixed | `EngageDashboardView` (rendered inside the new `/admin/engage/[id]` page) already renders its own `<main className="shell app-page">`. The new billing section originally wrapped itself in a second `<main>` of the same classes — invalid HTML (two `<main>` landmarks on one page) caught by re-reading the component before deploying, not after. Fixed by using a `<div className="shell app-page">` for the new section instead, which gets identical CSS (the stylesheet targets the class, not the tag) without a second landmark. |
+| 2026-08-21 | Deploy | — | — | `vercel --prod --yes`: `dpl_Eg2BLj7gQKNYnWgVcB2oSCc9DkCa`, aliased to `capture.com.ng`. |
+| 2026-08-21 | Production health check post-deploy | e2e (real production) | Pass | `/` → 200, `/admin` → 307, `/admin/engage/<uuid>` → 307 (expected login redirects for an unauthenticated request, not 500s). |
+
+No new migration — every column/table this reads (`plans`, `payments`, `escalation_notifications`, `businesses.plan_id`/`plan_status`/`trial_started_at`/`trial_ends_at`/`current_period_end`) already existed from DEV-22, so this was safe to deploy immediately without any founder-side manual step.
