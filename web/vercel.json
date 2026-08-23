@@ -4,6 +4,10 @@
     {
       "path": "/api/cron/escalation-timers",
       "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/cron/conversation-analytics",
+      "schedule": "0 6 * * 1"
     }
   ]
 }

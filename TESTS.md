@@ -895,3 +895,18 @@ Founder request: "admin doesn't seem well optimized to fully understand the busi
 | 2026-08-21 | Production health check post-deploy | e2e (real production) | Pass | `/` → 200, `/admin` → 307, `/admin/engage/<uuid>` → 307 (expected login redirects for an unauthenticated request, not 500s). |
 
 No new migration — every column/table this reads (`plans`, `payments`, `escalation_notifications`, `businesses.plan_id`/`plan_status`/`trial_started_at`/`trial_ends_at`/`current_period_end`) already existed from DEV-22, so this was safe to deploy immediately without any founder-side manual step.
+
+## Weekly Conversation Analytics (DEV-25)
+
+Founder asked to confirm whether the "weekly/monthly AI analytics of conversations surfacing trends, asks and opportunities" feature had actually been built. It hadn't — `has_analytics` was a real flag shown on the paywall comparison table, but nothing generated the content. Scoped via chat (data sources, generation mechanism, cadence, landing-page placement) before building, per explicit instruction; founder confirmed "yes, build it."
+
+| Date | Test | Type | Result | Notes |
+|---|---|---|---|---|
+| 2026-08-23 | `tsc --noEmit` after each piece (migration, generation module, cron route, `EngageDashboardView`) | build | Pass | Clean throughout. |
+| 2026-08-23 | **Real-model test of the analytics generation prompt** — 6 synthetic conversations (two Ferrari-availability asks in different phrasing, two discount-related escalations, one Sunday-hours question, one pure pleasantry), `server-only` guard stubbed locally to allow direct invocation, restored immediately after | integration (real model call) | Pass | Correctly grouped both recurring pairs into single `recurring_asks`/`escalation_themes` entries despite different phrasing each time (count: 2 for both); correctly identified all three real knowledge-base gaps (Ferrari availability, Sunday hours, discount policy) by comparing against the given approved-knowledge summary; correctly produced nothing for the one-off pleasantry rather than padding results. |
+| 2026-08-23 | `eslint` on all new/changed files | static | Pass | 0 errors. |
+| 2026-08-23 | Real `next build` | build | Pass | Full route table includes the new `/api/cron/conversation-analytics` route. |
+| 2026-08-23 | Deploy | — | — | `vercel --prod --yes`: `dpl_X8MkJfZ3FDizpfcd2E4WbYRSwE9S`, aliased to `capture.com.ng`. |
+| 2026-08-23 | Production health check post-deploy | e2e (real production) | Pass | `/` → 200, `/dashboard/engage` → 307 (expected login redirect). `/api/cron/conversation-analytics` → 401 without `CRON_SECRET`, confirming the auth guard is actually enforced live, not just present in code. |
+
+**Deliberately deployed without a migration-holdback guard**, unlike DEV-21/22: the new `conversation_analytics` table is read via an isolated `.from("conversation_analytics")` query that returns `null` gracefully if the table doesn't exist — never merged into an existing multi-purpose select the way `knowledge_base_seeded_at` almost was. Confirmed by re-reading the code before deploying, not assumed. **Migration confirmed run 2026-08-23** (founder, via Supabase dashboard SQL editor). No code changes needed — this build was deployed without a holdback guard from the start, so the feature simply activates now that the table exists. Next real-data check happens at the next Monday 06:00 UTC cron run.

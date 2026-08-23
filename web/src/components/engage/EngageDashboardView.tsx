@@ -26,7 +26,11 @@ export async function EngageDashboardView({
 }) {
   const supabase = await createClient();
 
-  const { data: business } = await supabase.from("businesses").select("id, name").eq("id", businessId).maybeSingle();
+  const { data: business } = await supabase
+    .from("businesses")
+    .select("id, name, plan_id, plan_status")
+    .eq("id", businessId)
+    .maybeSingle();
   if (!business) {
     return (
       <main className="shell app-page">
@@ -35,6 +39,25 @@ export async function EngageDashboardView({
       </main>
     );
   }
+
+  // Founder request 2026-08-23: the "weekly AI analytics" feature promised
+  // on the Standard-tier paywall card, actually generated now (DEV-25) by
+  // api/cron/conversation-analytics. Only rendered for a business whose
+  // active plan actually includes it — never a locked/teaser state here,
+  // that upsell messaging already lives on the paywall comparison table.
+  const { data: analyticsPlan } =
+    business.plan_status === "active" && business.plan_id
+      ? await supabase.from("plans").select("has_analytics").eq("id", business.plan_id).maybeSingle()
+      : { data: null };
+  const { data: latestAnalytics } = analyticsPlan?.has_analytics
+    ? await supabase
+        .from("conversation_analytics")
+        .select("period_start, period_end, conversation_count, recurring_asks, escalation_themes, knowledge_gaps")
+        .eq("business_id", businessId)
+        .order("period_start", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+    : { data: null };
 
   const { data: conversations } = await supabase
     .from("conversations")
@@ -128,6 +151,60 @@ export async function EngageDashboardView({
           </tbody>
         </table>
       </section>
+
+      {latestAnalytics && (
+        <section>
+          <h2>Analytics</h2>
+          <p className="meta">
+            Week of {new Date(latestAnalytics.period_start).toLocaleDateString()} –{" "}
+            {new Date(latestAnalytics.period_end).toLocaleDateString()}, from {latestAnalytics.conversation_count}{" "}
+            conversation{latestAnalytics.conversation_count === 1 ? "" : "s"}. Only real, recurring patterns — never
+            invented, never a prediction.
+          </p>
+          <div className="app-grid">
+            <div>
+              <h3>Recurring asks</h3>
+              {(latestAnalytics.recurring_asks as { ask: string; count: number }[]).length > 0 ? (
+                <ul>
+                  {(latestAnalytics.recurring_asks as { ask: string; count: number }[]).map((a, i) => (
+                    <li key={i}>
+                      {a.ask} <span className="meta">({a.count}×)</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="meta">Nothing recurred this period.</p>
+              )}
+            </div>
+            <div>
+              <h3>Escalation themes</h3>
+              {(latestAnalytics.escalation_themes as { theme: string; count: number }[]).length > 0 ? (
+                <ul>
+                  {(latestAnalytics.escalation_themes as { theme: string; count: number }[]).map((t, i) => (
+                    <li key={i}>
+                      {t.theme} <span className="meta">({t.count}×)</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="meta">Nothing recurred this period.</p>
+              )}
+            </div>
+            <div>
+              <h3>Knowledge gaps</h3>
+              {(latestAnalytics.knowledge_gaps as string[]).length > 0 ? (
+                <ul>
+                  {(latestAnalytics.knowledge_gaps as string[]).map((g, i) => (
+                    <li key={i}>{g}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="meta">No gaps found this period.</p>
+              )}
+            </div>
+          </div>
+        </section>
+      )}
 
       <section >
         <h2>Simulate an inbound message</h2>
