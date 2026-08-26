@@ -60,7 +60,7 @@ export default async function DashboardPage({
   const { data: business } = await supabase
     .from("businesses")
     .select(
-      "id, name, industry, upload_token, onboarded_at, recover_activated_at, prevent_activated_at, plan_status, trial_started_at, trial_ends_at, current_period_end",
+      "id, name, industry, upload_token, onboarded_at, prevent_activated_at, plan_status, trial_started_at, trial_ends_at, current_period_end",
     )
     .eq("id", businessId)
     .maybeSingle();
@@ -278,7 +278,12 @@ export default async function DashboardPage({
         </section>
 
         <section>
-          <h2>Recover {business.recover_activated_at ? "· Active" : "· Not activated"}</h2>
+          {/* 2026-08-25: real purchase-gated access now lives entirely at
+              /dashboard/recover (see that page's gate) — no activation
+              status is claimed here to avoid two places computing it and
+              drifting apart, the exact gap that used to leave this page's
+              free ActivateButton reachable regardless of real access. */}
+          <h2>Recover</h2>
           <table className="table">
             <tbody>
               <tr>
@@ -298,7 +303,6 @@ export default async function DashboardPage({
           <p>
             <Link href="/dashboard/recover">Manage campaign →</Link>
           </p>
-          {!business.recover_activated_at && <ActivateButton businessId={businessId} product="recover" />}
         </section>
 
         <section>

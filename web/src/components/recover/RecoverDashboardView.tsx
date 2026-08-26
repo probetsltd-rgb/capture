@@ -41,10 +41,16 @@ export async function RecoverDashboardView({
   businessId,
   backHref,
   backLabel,
+  lookbackMonths,
 }: {
   businessId: string;
   backHref: string;
   backLabel: string;
+  // How much history the business paid for (recover_purchases.lookback_months,
+  // max across their purchases — see dashboard/recover/page.tsx). Undefined
+  // means unbounded, for the founder-facing /admin/recover/[businessId] view,
+  // which isn't gated by a purchase.
+  lookbackMonths?: number;
 }) {
   const supabase = await createClient();
 
@@ -98,10 +104,24 @@ export async function RecoverDashboardView({
     : { data: [] as { id: string; last_message_at: string | null }[] };
   const lastMessageByConversationId = new Map((sourceConversations ?? []).map((c) => [c.id, c.last_message_at]));
 
+  // New 2026-08-25 (Recover paid tiers): a business only paid to have this
+  // many months of history worked. An opportunity with no resolvable
+  // timestamp is kept rather than hidden — an unknown age isn't evidence
+  // it's out of window, and silently dropping it would look like data loss
+  // to whoever's reading this table.
+  const cutoff = lookbackMonths != null ? new Date() : null;
+  if (cutoff) cutoff.setMonth(cutoff.getMonth() - lookbackMonths!);
+  const inWindow = (opportunities ?? []).filter((o) => {
+    if (!cutoff) return true;
+    const t = o.source_conversation_id ? lastMessageByConversationId.get(o.source_conversation_id) : null;
+    if (!t) return true;
+    return new Date(t).getTime() >= cutoff.getTime();
+  });
+
   // Oldest first — otherwise a stale, easy-to-miss lead sits below fresher
   // same-intent ones purely by insertion order, the exact prioritization
   // trap being fixed here.
-  const opps = [...(opportunities ?? [])].sort((a, b) => {
+  const opps = [...inWindow].sort((a, b) => {
     const aTime = a.source_conversation_id ? lastMessageByConversationId.get(a.source_conversation_id) : null;
     const bTime = b.source_conversation_id ? lastMessageByConversationId.get(b.source_conversation_id) : null;
     if (!aTime && !bTime) return 0;
@@ -118,6 +138,12 @@ export async function RecoverDashboardView({
         <Link href={backHref}>{backLabel}</Link>
       </p>
       <h1>Recover — {business.name}</h1>
+      {lookbackMonths != null && (
+        <p className="meta">
+          Showing opportunities from the last {lookbackMonths} month{lookbackMonths === 1 ? "" : "s"} of
+          conversations, per your plan.
+        </p>
+      )}
 
       <section >
         <h2>Campaign dashboard</h2>

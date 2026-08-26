@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { SiteNav, SiteFooter } from "@/components/SiteChrome";
 import { ScrollReveal } from "@/components/ScrollReveal";
-import { RevenueLedger } from "@/components/RevenueLedger";
 import { EngageResponseDemo } from "@/components/EngageResponseDemo";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 // Engage-first homepage rebuild (Capture_PRD_Addendum_v2.md §2, §28;
 // PLANS.md Phase 5.7) — replaces the previous Find-led version, which
@@ -16,9 +16,81 @@ import { EngageResponseDemo } from "@/components/EngageResponseDemo";
 // device, `.flow` step lists, realised/dormant semantic colour, mono for
 // machine-recorded numbers) is unchanged from AD-8 — this is a narrative
 // restructure within the existing system, not a new one.
-export default function Home() {
+//
+// 2026-08-25 revision (founder-directed audit): the products strip below
+// revives `.products`/`.product` from `globals.css` — CSS left in place
+// when the pre-pivot three-equal-steps homepage was deleted in commit
+// 1021dc5, never reused since. Same rule applies here as everywhere else
+// on this page: `tone` on a `.tag` is reserved for realised/dormant
+// *revenue* meaning, so product-status tags below intentionally carry no
+// tone — a product being "live" or "from ₦X" isn't a revenue outcome and
+// coloring it that way would be exactly the decorative use the CSS
+// header comment rules out.
+//
+type EngagePlanRow = {
+  id: string;
+  display_name: string;
+  price_kobo: number;
+  message_limit: number | null;
+  escalation_notification_limit: number;
+  has_analytics: boolean;
+};
+
+function formatNaira(kobo: number): string {
+  return `₦${(kobo / 100).toLocaleString("en-NG")}`;
+}
+
+// Without this the page prerenders fully static at build time and bakes in
+// whatever `plans` prices existed then — an /admin/plans edit would never
+// reach this page without a redeploy. 5 minutes is a deliberately loose
+// bound: pricing changes are rare, so this trades a little staleness for
+// keeping the homepage cheap/fast to serve, not force-dynamic on every hit.
+export const revalidate = 300;
+
+export default async function Home() {
+  // Public, unauthenticated page — service-role client, same pattern as
+  // report/[token]/page.tsx, so this reads live from the same `plans`
+  // table /admin/plans edits (never a hardcoded, driftable figure) without
+  // needing an RLS change for anonymous access.
+  const supabase = createServiceRoleClient();
+  const { data: plans } = await supabase
+    .from("plans")
+    .select("id, display_name, price_kobo, message_limit, escalation_notification_limit, has_analytics")
+    .order("price_kobo", { ascending: true });
+  const engagePlans = (plans ?? []) as EngagePlanRow[];
+
+  // Mirrors only what's actually visible on this page (name, hero
+  // description, the 7-day free trial, and now the real live tier prices
+  // rendered in the pricing section below) — structured data must match
+  // on-page content, not assert anything the page itself doesn't say. Built
+  // from the same `engagePlans` fetch as the pricing cards so the two can
+  // never diverge.
+  const softwareApplicationJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    name: "Capture — Engage",
+    applicationCategory: "BusinessApplication",
+    operatingSystem: "Web",
+    description:
+      "Engage responds instantly to enquiries wherever they come in, qualifies them, and escalates anything sensitive to a person, while keeping every conversation moving toward an outcome.",
+    offers: [
+      { "@type": "Offer", description: "7-day free trial", priceCurrency: "NGN", price: "0" },
+      ...engagePlans.map((plan) => ({
+        "@type": "Offer",
+        name: plan.display_name,
+        priceCurrency: "NGN",
+        price: String(plan.price_kobo / 100),
+        priceSpecification: { "@type": "UnitPriceSpecification", billingDuration: "P1M" },
+      })),
+    ],
+  };
+
   return (
     <div className="page">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareApplicationJsonLd) }}
+      />
       <ScrollReveal />
       <SiteNav />
 
@@ -33,7 +105,7 @@ export default function Home() {
                 the loop for anything that needs a person.
               </p>
               <div className="row" style={{ marginTop: "var(--s6)", gap: "var(--s4)" }}>
-                <Link href="/signup" className="btn btn--primary">
+                <Link href="/signup?intent=engage" className="btn btn--primary">
                   Try Free
                 </Link>
                 <a href="#how-it-works" className="btn btn--secondary">
@@ -56,7 +128,7 @@ export default function Home() {
           <div className="shell">
             <div className="inbox">
               <h2 className="display" data-reveal>
-                Every enquiry that waits is revenue that walks.
+                Your next customer is already in your inbox.
               </h2>
 
               <div className="inbox__list" data-reveal data-reveal-delay="100">
@@ -81,7 +153,7 @@ export default function Home() {
               <span className="step__line" />
             </div>
             <h2 className="h2" data-reveal>
-              One conversation, five real steps.
+              From enquiry to outcome, five real steps.
             </h2>
 
             <ol className="flow" data-reveal data-reveal-delay="80" style={{ marginTop: "var(--s6)", maxWidth: "60ch" }}>
@@ -97,14 +169,123 @@ export default function Home() {
         {/* --------------------------------------------------- team role --- */}
         <section className="band band--ruled band--tint">
           <div className="shell cta" data-reveal>
-            <h2 className="h2">Engage handles the volume. Your team handles what matters.</h2>
+            <h2 className="h2">Engage keeps every conversation moving toward an outcome.</h2>
             <p className="body" style={{ marginTop: "var(--s4)" }}>
-              The goal was never to take your team out of the conversation. It&apos;s to make sure
-              every conversation keeps moving toward an answer — automatically where that&apos;s
-              safe, by a person where it isn&apos;t.
+              Your team stays in the loop for anything that needs a person. The goal was never to
+              take your team out of the conversation. It&apos;s to make sure every conversation
+              keeps moving toward an answer — automatically where that&apos;s safe, by a person
+              where it isn&apos;t. And when something does escalate, it reaches your team, not just
+              whoever happens to be watching the dashboard.
             </p>
           </div>
         </section>
+
+        {/* ---------------------------------------------- products strip --- */}
+        <section className="band band--ruled" id="products">
+          <div className="shell">
+            <h2 className="h2" data-reveal>
+              Three ways Capture puts revenue back in view.
+            </h2>
+
+            <div className="products" data-reveal data-reveal-delay="80">
+              <ProductRow
+                n="01"
+                name="Engage"
+                what="Responds to new enquiries instantly, qualifies them, and escalates anything that needs a person."
+                status="Live on Instagram · WhatsApp coming soon"
+                href="/signup?intent=engage"
+                cta="Try Engage Free"
+              />
+              <ProductRow
+                n="02"
+                name="Find"
+                what="A free, priced report on the revenue sitting in conversations you already have."
+                status="Free · about 10–15 minutes"
+                href="/find"
+                cta="Find My Revenue Leaks"
+              />
+              <ProductRow
+                n="03"
+                name="Recover"
+                what="Ranks your dormant leads, times the outreach, and stops the moment someone replies."
+                status="Priced by history window · you send the outreach"
+                href="/recover"
+                cta="Explore Recover"
+              />
+            </div>
+          </div>
+        </section>
+
+        {/* -------------------------------------------- engage pricing --- */}
+        {engagePlans.length > 0 && (
+          <section className="band band--ruled band--tint">
+            <div className="shell">
+              <div className="step">
+                <span>Engage pricing</span>
+                <span className="step__line" />
+              </div>
+              <h2 className="h2" data-reveal>
+                Simple pricing to start.
+              </h2>
+              <p className="body" style={{ marginTop: "var(--s3)", maxWidth: "56ch" }}>
+                One channel (Instagram) today. Try any tier free for 7 days — no card needed.
+              </p>
+
+              <div
+                data-reveal
+                data-reveal-delay="80"
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+                  gap: "var(--s5)",
+                  maxWidth: "760px",
+                  marginTop: "var(--s6)",
+                }}
+              >
+                {engagePlans.map((plan) => (
+                  <div
+                    key={plan.id}
+                    style={{
+                      padding: "var(--s5)",
+                      border: "1px solid var(--rule)",
+                      borderRadius: "var(--radius)",
+                      background: "var(--paper)",
+                    }}
+                  >
+                    <h3 className="h3">{plan.display_name}</h3>
+                    <p className="mono" style={{ fontSize: "1.5rem", marginTop: "var(--s2)" }}>
+                      {formatNaira(plan.price_kobo)}
+                      <span className="meta" style={{ fontWeight: 400 }}>
+                        /mo
+                      </span>
+                    </p>
+                    <ul className="meta" style={{ paddingLeft: "1.1rem", marginTop: "var(--s4)" }}>
+                      <li>
+                        {plan.message_limit
+                          ? `${plan.message_limit.toLocaleString()} AI-handled messages/mo`
+                          : "Unlimited messages"}
+                      </li>
+                      <li>
+                        {plan.escalation_notification_limit === 1
+                          ? "Escalations go to 1 team member"
+                          : `Escalations reach up to ${plan.escalation_notification_limit} team members`}
+                      </li>
+                      <li>Knowledge-base assist (30-day history review)</li>
+                      {plan.has_analytics && <li>Weekly/monthly conversation analytics</li>}
+                    </ul>
+                    <Link
+                      href="/signup?intent=engage"
+                      className="btn btn--primary btn--block"
+                      style={{ marginTop: "var(--s5)" }}
+                    >
+                      Try Free — no card needed
+                    </Link>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
 
         {/* ---------------------------------------------- seven-day proof --- */}
         <section className="band band--ruled">
@@ -159,72 +340,53 @@ export default function Home() {
           </div>
         </section>
 
-        {/* --------------------------------------------------- find cta --- */}
-        <section className="band band--ruled band--tint" id="find">
-          <div className="shell split">
-            <div className="split__copy" data-reveal>
-              <h2 className="h2">Want to see where you&apos;re already losing revenue?</h2>
-              <p className="body" style={{ marginTop: "var(--s4)" }}>
-                Find reads your existing conversations and prices what&apos;s sitting there
-                unanswered or unfollowed-up. Free, and it doesn&apos;t require Engage.
-              </p>
-              <Link href="/find" className="btn btn--secondary" style={{ marginTop: "var(--s5)" }}>
-                Find My Revenue Leaks
-              </Link>
-            </div>
+        {/* ------------------------------------------------- why capture --- */}
+        <section className="band band--ruled band--tint">
+          <div className="shell">
+            <h2 className="h2" data-reveal>
+              Why Capture.
+            </h2>
 
-            <div className="split__surface" data-reveal data-reveal-delay="120">
-              <RevenueLedger />
-            </div>
-          </div>
-        </section>
-
-        {/* ------------------------------------------------ recover cta --- */}
-        <section className="band band--ruled" id="recover">
-          <div className="shell split split--reverse">
-            <div className="split__copy" data-reveal>
-              <h2 className="h2">Have old leads or customers worth going back to?</h2>
-              <p className="body" style={{ marginTop: "var(--s4)" }}>
-                Recover ranks every dormant opportunity, times the approach, and stops the moment
-                someone replies. Also independent of Engage.
-              </p>
-              <Link href="/signup" className="btn btn--secondary" style={{ marginTop: "var(--s5)" }}>
-                Explore Recover
-              </Link>
-            </div>
-
-            <div className="split__surface" data-reveal data-reveal-delay="120">
-              <div className="surface">
-                <div className="surface__bar">
-                  <span className="surface__title">Recovery — Chinedu M.</span>
-                  <span className="badge-demo">Illustrative</span>
-                </div>
-                <div className="panel__body">
-                  <ol className="flow">
-                    <FlowStep label="Opportunity identified" note="Quote sent, no follow-up for 6 days" />
-                    <FlowStep label="Customer contacted" note="Timed to the opportunity, not a blast" />
-                    <FlowStep label="Customer responds" note="Outreach stops automatically" tone="dormant" />
-                    <FlowStep label="Revenue recorded" note="₦1,200,000 recovered" tone="realised" />
-                  </ol>
-                </div>
-              </div>
+            <div
+              data-reveal
+              data-reveal-delay="80"
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+                gap: "var(--s6)",
+                marginTop: "var(--s6)",
+              }}
+            >
+              <WhyItem
+                title="Never guesses"
+                body="Every reply comes only from knowledge you've explicitly approved. Anything else — or anything sensitive — goes to a person, not a best-effort answer."
+              />
+              <WhyItem
+                title="Reaches the right people"
+                body="An escalation emails your team in priority order, not one inbox that has to happen to be watching."
+              />
+              <WhyItem
+                title="Starts from what already happened"
+                body="Your first week runs against a real 30-day baseline built from your own history, not a cold start."
+              />
+              <WhyItem
+                title="Only numbers you can measure"
+                body="No invented revenue figures, anywhere on this site or in your dashboard — including the demos above."
+              />
             </div>
           </div>
         </section>
 
         {/* ------------------------------------------------------- cta --- */}
-        <section className="band band--ruled band--tint">
+        <section className="band band--ruled band--ink">
           <div className="shell cta" data-reveal>
-            <h2 className="h2">Stop losing money from delayed DM responses.</h2>
+            <h2 className="h2">You already have the enquiries. Stop losing them.</h2>
             <p className="lede" style={{ marginTop: "var(--s4)" }}>
-              Try Engage free for 7 days.
+              Try Engage free for 7 days — no card needed.
             </p>
             <div className="row" style={{ marginTop: "var(--s6)", gap: "var(--s4)" }}>
-              <Link href="/signup" className="btn btn--primary">
+              <Link href="/signup?intent=engage" className="btn btn--primary">
                 Try Engage Free
-              </Link>
-              <Link href="/login" className="btn btn--secondary">
-                Sign in
               </Link>
             </div>
           </div>
@@ -262,5 +424,50 @@ function FlowStep({
         </span>
       </span>
     </li>
+  );
+}
+
+function ProductRow({
+  n,
+  name,
+  what,
+  status,
+  href,
+  cta,
+}: {
+  n: string;
+  name: string;
+  what: string;
+  status: string;
+  href: string;
+  cta: string;
+}) {
+  return (
+    <div className="product">
+      <span className="product__n mono">{n}</span>
+      <div className="product__main">
+        <h3 className="h3">{name}</h3>
+        <p className="body" style={{ marginTop: "var(--s2)" }}>
+          {what}
+        </p>
+        <span className="tag" style={{ color: "var(--ink-3)", border: "1px solid var(--rule)" }}>
+          {status}
+        </span>
+      </div>
+      <Link href={href} className="btn btn--secondary product__cta">
+        {cta}
+      </Link>
+    </div>
+  );
+}
+
+function WhyItem({ title, body }: { title: string; body: string }) {
+  return (
+    <div>
+      <h3 className="h3">{title}</h3>
+      <p className="body" style={{ marginTop: "var(--s2)" }}>
+        {body}
+      </p>
+    </div>
   );
 }

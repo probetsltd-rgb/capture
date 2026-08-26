@@ -1,5 +1,12 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { SiteNav, SiteFooter } from "@/components/SiteChrome";
+
+export const metadata: Metadata = {
+  title: "Terms & Privacy",
+  description: "Capture's terms of service and privacy policy for Find, Recover, and Engage.",
+  alternates: { canonical: "/privacy" },
+};
 
 // Terms & Privacy — deliberately one document for the whole Capture
 // service, not three separate policies per product. Find, Recover, and

@@ -90,6 +90,34 @@ export function EngageResponseDemo() {
               )}
             </span>
           </li>
+          {answered && (
+            <li className="flow__step flow__step--realised">
+              <span className="flow__marker" aria-hidden="true">
+                <span className="flow__dot" />
+              </span>
+              <span>
+                <span className="flow__label">Qualified</span>
+                <span className="flow__note" style={{ display: "block" }}>
+                  Adaeze O. · Prado · this weekend — logged automatically
+                </span>
+              </span>
+            </li>
+          )}
+          {answered && (
+            <li className="flow__step flow__step--dormant">
+              <span className="flow__marker" aria-hidden="true">
+                <span className="flow__dot" />
+              </span>
+              <span>
+                <span className="flow__label">
+                  &ldquo;Can you knock off ₦20k?&rdquo; <span className="tag tag--dormant">Escalated</span>
+                </span>
+                <span className="flow__note" style={{ display: "block" }}>
+                  Price negotiation — routed straight to your team, not guessed at
+                </span>
+              </span>
+            </li>
+          )}
         </ol>
 
         <div className="stat-row" style={{ marginTop: "var(--s4)" }}>

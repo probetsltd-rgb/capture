@@ -34,7 +34,7 @@ export function PlanEditForm({ plan }: { plan: PlanRow }) {
         <input type="number" min="0" value={messageLimit} onChange={(e) => setMessageLimit(e.target.value)} />
       </label>
       <label>
-        Escalation notifications/month
+        Escalation recipients (team members, priority order: owner → admin → staff)
         <input type="number" min="0" value={escalationLimit} onChange={(e) => setEscalationLimit(e.target.value)} />
       </label>
       <label style={{ display: "flex", alignItems: "center", gap: "var(--s2)" }}>

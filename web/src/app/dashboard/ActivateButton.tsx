@@ -5,20 +5,17 @@ import { activateProduct } from "./actions";
 
 // PRD's billing/plan-limits scope is tracking product activation, not
 // payment processing (explicit V1 non-goal) — there is no real price to
-// show here. Activating was previously a bare button with zero explanation
-// of what it actually does, which a founder caught directly ("doesn't give
-// enough context"). This states the real mechanics honestly instead of
-// inventing pricing that doesn't exist.
-// The "prevent" key is the internal identifier (matches businesses.prevent_activated_at
-// and the "product" param elsewhere) — not renamed, per AD-9's decision to
+// show here for Engage's pilot (Recover's equivalent free-pilot path was
+// retired 2026-08-25 in favor of real payment — see
+// dashboard/recover/page.tsx). Activating was previously a bare button
+// with zero explanation of what it actually does, which a founder caught
+// directly ("doesn't give enough context"). This states the real
+// mechanics honestly instead of inventing pricing that doesn't exist.
+// The "prevent" key is the internal identifier (matches
+// businesses.prevent_activated_at) — not renamed, per AD-9's decision to
 // avoid DB/internal churn with zero customer-visible benefit. Only the
 // display label changed to "Engage".
-const PRODUCT_INFO: Record<"recover" | "prevent", { label: string; explainer: string }> = {
-  recover: {
-    label: "Recover",
-    explainer:
-      "Unlocks the campaign manager at /dashboard/recover — you'll see every opportunity from your report, prioritised, with suggested timing. You send the outreach yourself for now (no automated WhatsApp sending yet); Capture tracks status and enforces the one-follow-up-max limit. No cost during your pilot.",
-  },
+const PRODUCT_INFO: Record<"prevent", { label: string; explainer: string }> = {
   prevent: {
     label: "Engage",
     explainer:
@@ -26,7 +23,7 @@ const PRODUCT_INFO: Record<"recover" | "prevent", { label: string; explainer: st
   },
 };
 
-export function ActivateButton({ businessId, product }: { businessId: string; product: "recover" | "prevent" }) {
+export function ActivateButton({ businessId, product }: { businessId: string; product: "prevent" }) {
   const [pending, startTransition] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
@@ -51,7 +48,7 @@ export function ActivateButton({ businessId, product }: { businessId: string; pr
           className="btn btn--primary"
           onClick={() =>
             startTransition(async () => {
-              const result = await activateProduct(businessId, product);
+              const result = await activateProduct(businessId);
               setMessage(result.message);
               if (result.ok) setConfirming(false);
             })

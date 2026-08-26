@@ -1,6 +1,12 @@
+import type { Metadata } from "next";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { SiteNav, SiteFooter } from "@/components/SiteChrome";
 import { UploadForm } from "./UploadForm";
+
+// Token-gated, per-business upload link — never indexable.
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+};
 
 export default async function UploadPage({
   params,

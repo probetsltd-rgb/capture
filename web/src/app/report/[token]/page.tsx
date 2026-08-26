@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
@@ -5,6 +6,11 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { generateRevenueLeakReport } from "@/lib/report/generate";
 import { SiteNav, SiteFooter } from "@/components/SiteChrome";
 import { InterestForm } from "./InterestForm";
+
+// Token-gated, per-business report — never indexable.
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+};
 
 const LEAK_LABELS: Record<string, string> = {
   no_response: "Unanswered enquiries",

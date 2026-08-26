@@ -13,19 +13,32 @@ const initialState = { error: null as string | null, sent: false };
 // and where it sends the user next. A `claim` token (from /report/[token]'s
 // "Create your account" CTA) carries through to /onboarding, which does the
 // actual account-linking — see onboarding/actions.ts.
+const INTENT_COPY: Record<string, { title: string; body: string }> = {
+  engage: {
+    title: "Start your 7-day Engage trial",
+    body: "We'll email you a link — no password, no card needed.",
+  },
+  recover: {
+    title: "Get started with Recover",
+    body: "We'll email you a link. You'll pick a history window and get set up from your dashboard.",
+  },
+};
+
 function SignupForm() {
   const searchParams = useSearchParams();
   const claim = searchParams.get("claim");
+  const intent = searchParams.get("intent");
   const next = claim ? `/onboarding?claim=${encodeURIComponent(claim)}` : "/onboarding";
   const [state, formAction, pending] = useActionState(requestMagicLink, initialState);
+  const copy = intent ? INTENT_COPY[intent] : undefined;
 
   return (
     <div className="shell center-page">
-      <h1 className="h2">Create your account</h1>
+      <h1 className="h2">{claim ? "Create your account" : (copy?.title ?? "Create your account")}</h1>
       <p className="body" style={{ marginTop: "var(--s3)" }}>
         {claim
           ? "Enter the email your audit was sent to and we'll link it to your new account."
-          : "We'll email you a link. No password to remember."}
+          : (copy?.body ?? "We'll email you a link. No password to remember.")}
       </p>
 
       {state.sent ? (

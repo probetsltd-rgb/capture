@@ -105,30 +105,18 @@ async function checkMessageLimitGate(
   return null;
 }
 
-// Founder instruction 2026-08-21: this cap gates notification *volume*
-// only — a conversation the AI can't safely answer always escalates
-// (state: human_required, always dashboard-visible) regardless of this
-// check. This only decides whether that escalation also sends an active
-// email/WhatsApp ping. Uncapped during trial, same reasoning as the
-// message limit above.
-async function isEscalationNotificationAllowed(
-  supabase: SupabaseClient,
-  businessId: string,
-  planId: string | null,
-  currentPeriodEnd: string | null,
-): Promise<boolean> {
-  if (!planId) return true;
-
+// Founder decision 2026-08-25: this used to gate notification *volume* —
+// after N events in a billing period, further escalations went silent
+// (dashboard-only). Replaced: an escalation the AI can't safely answer
+// always escalates AND always notifies now; this instead resolves how many
+// team members (in role-priority order — see escalation-email.ts) hear
+// about each one, which is what plans.escalation_notification_limit now
+// means. Uncapped (returns null = every member) with no plan, same
+// reasoning as the message limit above.
+async function resolveEscalationRecipientLimit(supabase: SupabaseClient, planId: string | null): Promise<number | null> {
+  if (!planId) return null;
   const { data: plan } = await supabase.from("plans").select("escalation_notification_limit").eq("id", planId).maybeSingle();
-  if (!plan) return true;
-
-  const { count } = await supabase
-    .from("escalation_notifications")
-    .select("id", { count: "exact", head: true })
-    .eq("business_id", businessId)
-    .gte("sent_at", currentPeriodStart(currentPeriodEnd).toISOString());
-
-  return (count ?? 0) < plan.escalation_notification_limit;
+  return plan?.escalation_notification_limit ?? null;
 }
 
 // PRD §17D: merge newly-extracted fields onto the conversation, never
@@ -333,29 +321,26 @@ export async function handleInboundMessage(
       ? await supabase.from("customers").select("name").eq("id", conv.customer_id).maybeSingle()
       : { data: null };
 
-    // Founder instruction 2026-08-21: this only caps whether a notification
-    // is *sent* — the escalation above already happened and is already
-    // dashboard-visible regardless of this check. Uncapped during trial.
-    const notificationAllowed =
-      business?.plan_status === "active"
-        ? await isEscalationNotificationAllowed(
-            supabase,
-            businessId,
-            (business.plan_id as string | null) ?? null,
-            (business.current_period_end as string | null) ?? null,
-          )
-        : true;
+    // Founder decision 2026-08-25: every escalation notifies now — no
+    // monthly cap on whether it happens at all. What the plan controls is
+    // how many team members hear about it (see resolveEscalationRecipientLimit
+    // / getBusinessRecipientEmails's role-priority ordering). Unlimited
+    // (every member) when not on an active plan (trial/unbilled).
+    const recipientLimit =
+      business?.plan_status === "active" ? await resolveEscalationRecipientLimit(supabase, (business.plan_id as string | null) ?? null) : null;
 
-    if (notificationAllowed) {
-      await sendEscalationNotification({
-        businessId,
-        businessName: (business?.name as string | null) ?? "Your business",
-        customerName: (customer?.name as string | null) ?? null,
-        escalationReason: reason,
-        conversationUrl: `${getSiteUrl()}/dashboard/engage`,
-      });
-      await supabase.from("escalation_notifications").insert({ business_id: businessId, conversation_id: conversationId });
-    }
+    await sendEscalationNotification({
+      businessId,
+      businessName: (business?.name as string | null) ?? "Your business",
+      customerName: (customer?.name as string | null) ?? null,
+      escalationReason: reason,
+      conversationUrl: `${getSiteUrl()}/dashboard/engage`,
+      recipientLimit,
+    });
+    // Historical record that a notification was sent for this escalation —
+    // no longer read to gate anything (that's the whole point of this
+    // change), kept as an audit trail, same append-only spirit as `payments`.
+    await supabase.from("escalation_notifications").insert({ business_id: businessId, conversation_id: conversationId });
 
     return { status: "escalated", reason };
   }

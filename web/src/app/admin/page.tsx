@@ -126,6 +126,8 @@ export default async function AdminPage() {
       <p>Signed in as {claims?.claims.email ?? "unknown"}.</p>
       <p className="meta">
         <Link href="/admin/plans">Manage Engage plans/pricing →</Link>
+        {" · "}
+        <Link href="/admin/recover-plans">Manage Recover plans/pricing →</Link>
       </p>
 
       <section style={{ margin: "2rem 0" }}>

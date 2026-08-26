@@ -1,33 +1,34 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { startSubscription } from "./actions";
+import { startRecoverPurchase } from "@/app/dashboard/recover/actions";
 
-export type PlanOption = {
+export type RecoverPlanOption = {
   id: string;
   displayName: string;
   priceKobo: number;
-  messageLimit: number | null;
-  escalationNotificationLimit: number;
-  hasAnalytics: boolean;
+  lookbackMonths: number;
 };
 
 function formatNaira(kobo: number): string {
   return `₦${(kobo / 100).toLocaleString("en-NG")}`;
 }
 
-// Founder request 2026-08-21: pay-to-continue at trial end — no card was
-// collected upfront, so this is the point where a lapsed trial (or a
-// business choosing to upgrade early) actually starts a real Paystack
-// checkout. Mirrors ActivateButton.tsx's confirm-then-submit pattern.
-export function EngagePaywall({ businessId, reason, plans }: { businessId: string; reason: string; plans: PlanOption[] }) {
+// Mirrors EngagePaywall.tsx's confirm-then-checkout UI, but for a one-time
+// purchase, not a recurring plan: no "per month," and every tier here is
+// something you own once you've paid for it, not something that lapses.
+export function RecoverPaywall({ businessId, plans }: { businessId: string; plans: RecoverPlanOption[] }) {
   const [pending, startTransition] = useTransition();
   const [confirmingPlan, setConfirmingPlan] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
   return (
     <div className="stack" style={{ margin: "0.5rem 0" }}>
-      <p className="notice notice--error">{reason}</p>
+      <p className="body">
+        Recover ranks every dormant opportunity in your history, times the approach, and stops the
+        moment someone replies. You send the outreach yourself for now — no automated WhatsApp
+        sending yet. Pick how much history to work through:
+      </p>
       <div style={{ display: "flex", gap: "var(--s4)", flexWrap: "wrap" }}>
         {plans.map((plan) => (
           <div
@@ -36,17 +37,11 @@ export function EngagePaywall({ businessId, reason, plans }: { businessId: strin
           >
             <h3 style={{ margin: 0 }}>{plan.displayName}</h3>
             <p className="mono" style={{ fontSize: "1.25rem" }}>
-              {formatNaira(plan.priceKobo)}/mo
+              {formatNaira(plan.priceKobo)}
             </p>
             <ul className="meta" style={{ paddingLeft: "1.2rem" }}>
-              <li>{plan.messageLimit ? `${plan.messageLimit.toLocaleString()} AI-handled messages/mo` : "Unlimited messages"}</li>
-              <li>
-                {plan.escalationNotificationLimit === 1
-                  ? "Escalations go to 1 team member"
-                  : `Escalations reach up to ${plan.escalationNotificationLimit} team members`}
-              </li>
-              <li>Knowledge-base assist (30-day history review)</li>
-              {plan.hasAnalytics && <li>Weekly/monthly conversation analytics</li>}
+              <li>Last {plan.lookbackMonths} months of conversation history</li>
+              <li>One-time — not a subscription</li>
             </ul>
             {confirmingPlan === plan.id ? (
               <div style={{ display: "flex", gap: "var(--s3)" }}>
@@ -55,7 +50,7 @@ export function EngagePaywall({ businessId, reason, plans }: { businessId: strin
                   className="btn btn--primary"
                   onClick={() =>
                     startTransition(async () => {
-                      const result = await startSubscription(businessId, plan.id);
+                      const result = await startRecoverPurchase(businessId, plan.id);
                       if (!result.ok) setMessage(result.message);
                     })
                   }
@@ -68,7 +63,7 @@ export function EngagePaywall({ businessId, reason, plans }: { businessId: strin
               </div>
             ) : (
               <button className="btn btn--primary" onClick={() => setConfirmingPlan(plan.id)}>
-                Subscribe to {plan.displayName}
+                Get {plan.displayName}
               </button>
             )}
           </div>

@@ -146,6 +146,20 @@ textarea {
   color: var(--paper);
 }
 
+/* .btn--primary is ink-on-paper everywhere else — inside an ink band that's
+   invisible (black button, black background). No dark band ever carried a
+   button before this, so there was no existing precedent to follow; this
+   inverts it the same way .band--ink already inverts body/lede/meta text
+   above, scoped to this context only. */
+.band--ink .btn--primary {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.band--ink .btn--primary:hover {
+  background: var(--paper-2);
+}
+
 /* A quiet second tone, not a second theme — same warm off-white already
    used for card-level surfaces elsewhere (--paper-2), applied to a whole
    band. Founder-caught 2026-08-21: every section after the dark "problem"

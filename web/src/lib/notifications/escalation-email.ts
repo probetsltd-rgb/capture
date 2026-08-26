@@ -18,17 +18,36 @@ function getResend(): Resend | null {
   return new Resend(apiKey);
 }
 
+// Founder decision 2026-08-25: escalation notifications are now scoped by
+// plan tier to a number of *recipients*, not a monthly count of *events* —
+// every escalation always notifies (nothing ever goes silent because a
+// monthly quota ran out), but only the top `recipientLimit` team members
+// hear about it, in role-priority order (owner, then admin, then staff;
+// ties broken by who joined first). `recipientLimit: null` means
+// unlimited — every member gets notified (no plan, or trial/unbilled).
+const ROLE_PRIORITY: Record<string, number> = { owner: 0, admin: 1, staff: 2 };
+
 // auth.users isn't queryable through the normal client — this is the
 // sanctioned way to resolve a member's email from the service role,
 // per Supabase's own Admin Auth API (not reaching into the auth schema
 // directly).
-async function getBusinessRecipientEmails(businessId: string): Promise<string[]> {
+async function getBusinessRecipientEmails(businessId: string, recipientLimit: number | null): Promise<string[]> {
   const supabase = createServiceRoleClient();
-  const { data: members } = await supabase.from("business_members").select("user_id").eq("business_id", businessId);
+  const { data: members } = await supabase
+    .from("business_members")
+    .select("user_id, role, created_at")
+    .eq("business_id", businessId);
   if (!members || members.length === 0) return [];
 
+  const ordered = [...members].sort((a, b) => {
+    const roleDiff = (ROLE_PRIORITY[a.role] ?? 99) - (ROLE_PRIORITY[b.role] ?? 99);
+    if (roleDiff !== 0) return roleDiff;
+    return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+  });
+  const selected = recipientLimit != null ? ordered.slice(0, recipientLimit) : ordered;
+
   const emails = await Promise.all(
-    members.map(async (m) => {
+    selected.map(async (m) => {
       const { data } = await supabase.auth.admin.getUserById(m.user_id);
       return data.user?.email ?? null;
     }),
@@ -42,6 +61,9 @@ export type EscalationNotification = {
   customerName: string | null;
   escalationReason: string;
   conversationUrl: string;
+  // Plan's escalation_notification_limit — how many team members (in role
+  // priority order) get this email. null = every member.
+  recipientLimit: number | null;
 };
 
 // Deliberately never throws — a notification failing to send must never
@@ -58,7 +80,7 @@ export async function sendEscalationNotification(notification: EscalationNotific
   }
 
   try {
-    const recipients = await getBusinessRecipientEmails(notification.businessId);
+    const recipients = await getBusinessRecipientEmails(notification.businessId, notification.recipientLimit);
     if (recipients.length === 0) {
       console.error(`Escalation notification skipped: no members found for business ${notification.businessId}`);
       return;

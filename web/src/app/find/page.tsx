@@ -52,9 +52,13 @@ export default function FindPage() {
             <div className="intake__aside">
               <h1 className="h2">Find My Revenue Leaks</h1>
               <p className="body" style={{ marginTop: "var(--s4)" }}>
-                Free, and it takes about a minute. Next we&apos;ll collect a sample of your
-                WhatsApp conversations and send back a priced report showing where enquiries went
-                unanswered or cold.
+                Free, always — about 10–15 minutes start to finish. Next we&apos;ll collect a
+                sample of your WhatsApp conversations and send back a priced report showing where
+                enquiries went unanswered or cold.
+              </p>
+              <p className="meta" style={{ marginTop: "var(--s3)" }}>
+                This audit is also the first step into Recover, if you want us to start working
+                through what we find.
               </p>
 
               <ol className="flow" style={{ marginTop: "var(--s6)" }}>

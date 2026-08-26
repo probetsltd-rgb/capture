@@ -21,43 +21,48 @@ import { getSiteUrl } from "@/lib/site-url";
 
 export type ActionResult = { ok: boolean; message: string };
 
-export async function activateProduct(businessId: string, product: "recover" | "prevent"): Promise<ActionResult> {
+// This used to take a `product: "recover" | "prevent"` param — "recover"
+// was a free "Activate Recover" pilot flag, retired 2026-08-25 when real,
+// paid Recover access replaced it (see dashboard/recover/page.tsx and
+// recover_purchases). Only "prevent" (Engage) is left, so the param is
+// gone rather than kept as a single-value formality. "prevent" internally
+// still refers to Engage (matches businesses.prevent_activated_at) — not
+// renamed, per AD-9's decision to avoid DB/internal churn with zero
+// customer-visible benefit; only the display label changed.
+export async function activateProduct(businessId: string): Promise<ActionResult> {
   const supabase = await createClient();
 
-  if (product === "prevent") {
-    // Only *approved* knowledge counts. Vertical-template onboarding seeds
-    // unapproved suggestions, and activating on the strength of those would
-    // put boilerplate no business ever confirmed in front of real customers.
-    const { count } = await supabase
-      .from("knowledge_items")
-      .select("id", { count: "exact", head: true })
-      .eq("business_id", businessId)
-      .not("approved_at", "is", null);
-    if (!count) {
-      return {
-        ok: false,
-        message:
-          "Approve at least one knowledge item before activating Prevent — starter-template suggestions don't count until you confirm them.",
-      };
-    }
+  // Only *approved* knowledge counts. Vertical-template onboarding seeds
+  // unapproved suggestions, and activating on the strength of those would
+  // put boilerplate no business ever confirmed in front of real customers.
+  const { count } = await supabase
+    .from("knowledge_items")
+    .select("id", { count: "exact", head: true })
+    .eq("business_id", businessId)
+    .not("approved_at", "is", null);
+  if (!count) {
+    return {
+      ok: false,
+      message:
+        "Approve at least one knowledge item before activating Prevent — starter-template suggestions don't count until you confirm them.",
+    };
   }
 
-  const column = product === "recover" ? "recover_activated_at" : "prevent_activated_at";
   const now = new Date();
-  const update: Record<string, string> = { [column]: now.toISOString() };
 
   // Founder request 2026-08-21: Engage's trial clock starts here, not at
   // signup — a business may sign up long before it's ready to actually
   // turn Engage on. trial_days lives in app_settings (admin-editable, not
   // hardcoded) so the trial length can be tuned without a redeploy.
-  if (product === "prevent") {
-    const { data: setting } = await supabase.from("app_settings").select("value").eq("key", "trial_days").maybeSingle();
-    const trialDays = Number(setting?.value ?? 7);
-    const trialEnds = new Date(now.getTime() + trialDays * 24 * 60 * 60 * 1000);
-    update.trial_started_at = now.toISOString();
-    update.trial_ends_at = trialEnds.toISOString();
-    update.plan_status = "trialing";
-  }
+  const { data: setting } = await supabase.from("app_settings").select("value").eq("key", "trial_days").maybeSingle();
+  const trialDays = Number(setting?.value ?? 7);
+  const trialEnds = new Date(now.getTime() + trialDays * 24 * 60 * 60 * 1000);
+  const update = {
+    prevent_activated_at: now.toISOString(),
+    trial_started_at: now.toISOString(),
+    trial_ends_at: trialEnds.toISOString(),
+    plan_status: "trialing",
+  };
 
   const { data, error } = await supabase.from("businesses").update(update).eq("id", businessId).select("id");
 
@@ -67,7 +72,7 @@ export async function activateProduct(businessId: string, product: "recover" | "
   }
 
   revalidatePath("/dashboard");
-  return { ok: true, message: `${product === "recover" ? "Recover" : "Prevent"} activated.` };
+  return { ok: true, message: "Engage activated." };
 }
 
 // Business-supplied escalation keywords are substring-matched against every

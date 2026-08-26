@@ -40,10 +40,10 @@ export function SiteNav() {
           <Link className="nav__link" href="/#how-it-works">
             How it works
           </Link>
-          <Link className="nav__link" href="/#find">
+          <Link className="nav__link" href="/find">
             Find
           </Link>
-          <Link className="nav__link" href="/#recover">
+          <Link className="nav__link" href="/recover">
             Recover
           </Link>
         </nav>
@@ -72,16 +72,17 @@ export function SiteFooter() {
           <div>
             <div className="nav__brand">Capture</div>
             <p className="meta" style={{ marginTop: "var(--s2)", maxWidth: "34ch" }}>
-              Capture helps businesses find revenue they&apos;re leaving on the table, recover
-              dormant leads, and respond to new enquiries instantly — across WhatsApp and Instagram.
+              Capture helps businesses respond to new enquiries instantly, recover dormant leads,
+              and find revenue they&apos;re leaving on the table — on Instagram today, WhatsApp
+              coming soon.
             </p>
           </div>
 
           <nav className="footer__col" aria-label="Product">
             <div className="footer__col-title">Product</div>
-            <Link href="/find">Find</Link>
-            <Link href="/#recover">Recover</Link>
             <Link href="/#how-it-works">Engage</Link>
+            <Link href="/find">Find</Link>
+            <Link href="/recover">Recover</Link>
           </nav>
 
           <nav className="footer__col" aria-label="Account">

@@ -1,5 +1,12 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { SiteNav, SiteFooter } from "@/components/SiteChrome";
+
+export const metadata: Metadata = {
+  title: "Data Deletion Instructions",
+  description: "How to request deletion of your data from Capture.",
+  alternates: { canonical: "/data-deletion" },
+};
 
 // Meta's Data Deletion Instructions requirement for App Review
 // (META_APP_REVIEW.md §1/§5) — a stable, public, unauthenticated URL

@@ -20,16 +20,74 @@ const mono = IBM_Plex_Mono({
   display: "swap",
 });
 
+const SITE_URL = "https://capture.com.ng";
+const SITE_NAME = "Capture";
+const DESCRIPTION =
+  "Capture helps established Nigerian businesses stop losing money from delayed DM responses — Engage replies to Instagram enquiries instantly and escalates anything sensitive to a person, while Find and Recover surface revenue already sitting in your existing conversations.";
+
 export const metadata: Metadata = {
-  title: "Capture — Turn more demand into revenue",
-  description:
-    "Capture helps established businesses find revenue they're leaving on the table, recover dormant opportunities, and respond to new enquiries instantly before they go cold.",
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: "Capture — Turn more demand into revenue",
+    template: "%s — Capture",
+  },
+  description: DESCRIPTION,
+  keywords: [
+    "Instagram DM automation",
+    "instant DM response",
+    "customer response time Nigeria",
+    "Lagos business automation",
+    "WhatsApp lead recovery",
+    "revenue leak detection",
+  ],
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    type: "website",
+    url: SITE_URL,
+    siteName: SITE_NAME,
+    title: "Capture — Turn more demand into revenue",
+    description: DESCRIPTION,
+    locale: "en_NG",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Capture — Turn more demand into revenue",
+    description: DESCRIPTION,
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: { index: true, follow: true },
+  },
+};
+
+// Organization schema, site-wide: gives search engines and LLM answer
+// engines (Perplexity, ChatGPT browsing, AI Overviews) an unambiguous
+// entity to attach page content to, independent of any one page's copy.
+const organizationJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  name: SITE_NAME,
+  url: SITE_URL,
+  description: DESCRIPTION,
+  areaServed: {
+    "@type": "Country",
+    name: "Nigeria",
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${sans.variable} ${mono.variable}`}>
-      <body>{children}</body>
+      <body>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }}
+        />
+        {children}
+      </body>
     </html>
   );
 }

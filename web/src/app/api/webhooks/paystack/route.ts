@@ -18,7 +18,7 @@ type PaystackEvent = {
     plan?: string | null;
     plan_object?: { plan_code?: string } | null;
     customer?: { customer_code?: string; email?: string } | null;
-    metadata?: { business_id?: string } | null;
+    metadata?: { business_id?: string; product?: string; recover_plan_id?: string } | null;
     subscription_code?: string;
   };
 };
@@ -57,6 +57,40 @@ async function processEvent(payload: PaystackEvent): Promise<void> {
   }
 
   const supabase = createServiceRoleClient();
+
+  if (event === "charge.success" && data.metadata?.product === "recover") {
+    const reference = data.reference;
+    const recoverPlanId = data.metadata?.recover_plan_id;
+    if (!reference || !recoverPlanId) return;
+
+    const { data: recoverPlan } = await supabase
+      .from("recover_plans")
+      .select("id, lookback_months")
+      .eq("id", recoverPlanId)
+      .maybeSingle();
+    if (!recoverPlan) {
+      console.error(`Paystack webhook: recover_plan_id ${recoverPlanId} not found`);
+      return;
+    }
+
+    // Idempotent on paystack_reference, same as the Engage payments insert
+    // below — a redelivered event is a no-op conflict, not a double-grant.
+    // No businesses UPDATE here: unlike Engage this is a one-time charge,
+    // not a subscription, so there's no plan_id/plan_status/
+    // current_period_end to set — access is derived from the existence of
+    // this row (see RecoverDashboardView/dashboard/recover/page.tsx).
+    const { error: insertError } = await supabase.from("recover_purchases").insert({
+      business_id: businessId,
+      recover_plan_id: recoverPlan.id,
+      paystack_reference: reference,
+      amount_kobo: data.amount ?? 0,
+      lookback_months: recoverPlan.lookback_months,
+    });
+    if (insertError && insertError.code !== "23505") {
+      console.error("Paystack webhook: failed to record Recover purchase", insertError);
+    }
+    return;
+  }
 
   if (event === "charge.success") {
     const reference = data.reference;
