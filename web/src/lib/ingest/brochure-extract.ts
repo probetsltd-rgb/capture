@@ -64,6 +64,64 @@ Rules:
 
 export type ExtractedKnowledgeItem = { category: (typeof CATEGORIES)[number]; content: string };
 
+// Founder request 2026-08-26: the conversation-history seed already reads
+// every past reply once to extract stated facts — reuse that same reading
+// to also surface what was NEVER stated (or stated incompletely) but a real
+// customer would ask about, e.g. delivery mentioned with no fee attached,
+// or returns/hours never coming up at all. A separate call/schema from
+// extractKnowledgeItems above (not a shared union) because this is asking
+// questions, not asserting facts — conflating the two schemas would blur
+// the "never infer beyond what was written" discipline that governs
+// extraction into inventing plausible-sounding gaps instead.
+const gapQuestionsSchema = z.object({
+  questions: z
+    .array(
+      z.object({
+        category: z.enum(CATEGORIES),
+        question: z.string().max(200).describe("A short, direct question to ask the business owner, in plain language."),
+      }),
+    )
+    .max(5)
+    .describe("3-5 questions about real gaps found in the replies. Fewer (even zero) only if there genuinely aren't that many gaps."),
+});
+
+const GAP_QUESTIONS_SYSTEM_PROMPT = `You review a business's own past Instagram replies to real customers and identify gaps worth asking the owner about directly, so their knowledge base can be strengthened beyond what customers happened to already ask.
+
+Rules:
+1. A gap is something a real customer would plausibly ask about that is either never mentioned in the replies at all, or mentioned incompletely (e.g. delivery is discussed but no fee or area is ever given; a product is named but no price appears anywhere).
+2. Never invent or guess an answer yourself — you are only proposing the QUESTION to ask the owner, never a guessed fact.
+3. Prefer concrete, answerable questions ("What do you charge for delivery outside Lagos?") over vague ones ("Tell me about delivery.").
+4. Category is one of: product, faq, hours, location, policy, delivery, booking, other — pick whichever the answer would belong to.
+5. Aim for 3-5 questions covering distinct gaps, not near-duplicates. If the replies genuinely leave few or no real gaps, return fewer questions (or none) rather than padding to 5.`;
+
+/**
+ * Propose 3-5 questions about gaps in a business's own past replies —
+ * things worth asking the owner directly to strengthen the knowledge base
+ * beyond what extractKnowledgeItems already pulled out. Conversation-history
+ * seeding only (see seedKnowledgeFromHistory) — not used for brochure
+ * uploads, which have no "gap" concept the same way. Returns null (never a
+ * guessed/partial result) on model failure, same discipline as
+ * extractKnowledgeItems.
+ */
+export async function extractKnowledgeGapQuestions(
+  sourceText: string,
+): Promise<{ category: (typeof CATEGORIES)[number]; question: string }[] | null> {
+  if (sourceText.trim().length < 20) return [];
+
+  try {
+    const { object } = await generateObject({
+      model: MODEL,
+      schema: gapQuestionsSchema,
+      system: GAP_QUESTIONS_SYSTEM_PROMPT,
+      prompt: `Here are a business's past customer-service replies. Propose 3-5 questions worth asking the owner to fill real gaps:\n\n${sourceText.slice(0, 20000)}`,
+    });
+    return object.questions;
+  } catch (error) {
+    if (NoObjectGeneratedError.isInstance(error)) return null;
+    throw error;
+  }
+}
+
 export async function extractTextFromPdf(buffer: Buffer): Promise<string> {
   const parser = new PDFParse({ data: buffer });
   const result = await parser.getText();

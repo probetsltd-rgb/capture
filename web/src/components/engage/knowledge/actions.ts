@@ -240,3 +240,74 @@ export async function uploadBrochure(businessId: string, formData: FormData): Pr
     message: `Extracted ${items.length} item${items.length === 1 ? "" : "s"} — review them below before they're used.`,
   };
 }
+
+// Founder request 2026-08-26: gap questions (see seedKnowledgeFromHistory in
+// lib/channels/instagram.ts) get answered, not approved — typing an answer
+// here IS the human confirmation, same rule as addKnowledgeItem's manual
+// "Add" form (a human just wrote this text themselves, right now), so the
+// resulting knowledge_items row is approved on creation, not queued into
+// the "Needs your review" list.
+export async function answerKnowledgeGapQuestion(
+  businessId: string,
+  questionId: string,
+  answer: string,
+): Promise<ActionResult> {
+  const content = answer.trim();
+  if (!content) return { ok: false, message: "Type an answer, or use Skip." };
+
+  const supabase = await createClient();
+  const { data: question, error: fetchError } = await supabase
+    .from("knowledge_gap_questions")
+    .select("id, category, question")
+    .eq("id", questionId)
+    .eq("business_id", businessId)
+    .eq("status", "pending")
+    .maybeSingle();
+
+  if (fetchError || !question) {
+    return { ok: false, message: "This question is no longer available." };
+  }
+
+  const { data: newItem, error: insertError } = await supabase
+    .from("knowledge_items")
+    .insert({
+      business_id: businessId,
+      category: question.category,
+      question: question.question,
+      content,
+      media_url: null,
+      approved_at: new Date().toISOString(),
+    })
+    .select("id")
+    .single();
+
+  if (insertError || !newItem) return { ok: false, message: "Could not save your answer." };
+
+  await supabase
+    .from("knowledge_gap_questions")
+    .update({ status: "answered", answered_at: new Date().toISOString(), resulting_knowledge_item_id: newItem.id })
+    .eq("id", questionId)
+    .eq("business_id", businessId);
+
+  revalidateKnowledgePaths(businessId);
+  return { ok: true, message: "Added — the AI can use this right away." };
+}
+
+export async function dismissKnowledgeGapQuestion(businessId: string, questionId: string): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("knowledge_gap_questions")
+    .update({ status: "dismissed" })
+    .eq("id", questionId)
+    .eq("business_id", businessId)
+    .eq("status", "pending")
+    .select("id");
+
+  if (error) return { ok: false, message: "Could not skip this question." };
+  if (!data || data.length === 0) {
+    return { ok: false, message: "This question is no longer available." };
+  }
+
+  revalidateKnowledgePaths(businessId);
+  return { ok: true, message: "Skipped." };
+}

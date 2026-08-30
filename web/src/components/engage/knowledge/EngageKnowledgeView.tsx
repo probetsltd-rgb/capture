@@ -6,6 +6,7 @@ import { BrochureUploadForm } from "./BrochureUploadForm";
 import { DeleteButton } from "./DeleteButton";
 import { ApproveButton } from "./ApproveButton";
 import { CompletenessToggle } from "./CompletenessToggle";
+import { KnowledgeGapQuestions } from "./KnowledgeGapQuestions";
 
 // Shared body for /admin/engage/[businessId]/knowledge and
 // /dashboard/engage/knowledge — see EngageDashboardView.tsx for why.
@@ -44,6 +45,14 @@ export async function EngageKnowledgeView({
   const pending = all.filter((i) => !i.approved_at);
   const approved = all.filter((i) => i.approved_at);
 
+  const { data: gapQuestionRows } = await supabase
+    .from("knowledge_gap_questions")
+    .select("id, category, question")
+    .eq("business_id", businessId)
+    .eq("status", "pending")
+    .order("created_at");
+  const gapQuestions = gapQuestionRows ?? [];
+
   return (
     <main className="shell app-page">
       <p>
@@ -67,6 +76,8 @@ export async function EngageKnowledgeView({
       <KnowledgeForm businessId={businessId} />
       <BulkAddForm businessId={businessId} />
       <BrochureUploadForm businessId={businessId} />
+
+      <KnowledgeGapQuestions businessId={businessId} questions={gapQuestions} />
 
       {pending.length > 0 && (
         <section style={{ margin: "1.5rem 0", padding: "1rem", border: "1px solid #a60", borderRadius: 4 }}>

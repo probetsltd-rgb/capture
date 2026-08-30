@@ -3,7 +3,7 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { encryptToken, decryptToken } from "./token-crypto";
 import { fetchConversationList, fetchConversationMessages } from "./instagram-api";
 import { classifyAndScoreConversations, type CreatedConversation } from "@/lib/ingest/classify-and-score";
-import { extractKnowledgeItems } from "@/lib/ingest/brochure-extract";
+import { extractKnowledgeItems, extractKnowledgeGapQuestions } from "@/lib/ingest/brochure-extract";
 import { redactPii } from "@/lib/classification/redact";
 
 // channel_connections has zero RLS policies for `authenticated` — see the
@@ -358,7 +358,11 @@ async function seedKnowledgeFromHistory(
     return;
   }
 
-  const items = await extractKnowledgeItems(businessReplies.join("\n\n"), "conversation_history");
+  const repliesText = businessReplies.join("\n\n");
+  const [items, gapQuestions] = await Promise.all([
+    extractKnowledgeItems(repliesText, "conversation_history"),
+    extractKnowledgeGapQuestions(repliesText),
+  ]);
 
   if (items && items.length > 0) {
     await supabase.from("knowledge_items").insert(
@@ -369,6 +373,20 @@ async function seedKnowledgeFromHistory(
         content: item.content,
         media_url: null,
         approved_at: null, // pending review, same as brochure/manual items
+      })),
+    );
+  }
+
+  // Founder request 2026-08-26: alongside what the AI extracted, also ask
+  // about what it noticed was missing — a separate table/UI from the
+  // pending-review list above (answering IS the approval here, see
+  // answerKnowledgeGapQuestion in components/engage/knowledge/actions.ts).
+  if (gapQuestions && gapQuestions.length > 0) {
+    await supabase.from("knowledge_gap_questions").insert(
+      gapQuestions.map((q) => ({
+        business_id: businessId,
+        category: q.category,
+        question: q.question,
       })),
     );
   }
