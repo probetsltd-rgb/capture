@@ -53,7 +53,7 @@ export function SiteNav() {
             {signedIn ? "Dashboard" : "Sign in"}
           </Link>
           <Link href="/signup" className="btn btn--primary">
-            Try Engage Free
+            Try Free
           </Link>
         </div>
       </div>
@@ -88,7 +88,7 @@ export function SiteFooter() {
           <nav className="footer__col" aria-label="Account">
             <div className="footer__col-title">Account</div>
             <Link href={signedIn ? "/dashboard" : "/login"}>{signedIn ? "Dashboard" : "Sign in"}</Link>
-            <Link href="/signup">Try Engage Free</Link>
+            <Link href="/signup">Try Free</Link>
           </nav>
 
           <nav className="footer__col" aria-label="Legal">
