@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { uploadKnowledgeMedia } from "@/lib/media/upload";
 import { extractTextFromPdf, extractKnowledgeItems } from "@/lib/ingest/brochure-extract";
+import { fetchWebsiteText } from "@/lib/ingest/website-extract";
 
 export type ActionResult = { ok: boolean; message: string };
 
@@ -238,6 +239,47 @@ export async function uploadBrochure(businessId: string, formData: FormData): Pr
   return {
     ok: true,
     message: `Extracted ${items.length} item${items.length === 1 ? "" : "s"} — review them below before they're used.`,
+  };
+}
+
+// Founder request 2026-08-30: a business's own website is often cleaner
+// source material than DM replies, and unlike the 30-day conversation
+// seed, it doesn't need any conversation history to exist — real help for
+// a brand-new business or one whose history has gone stale. Extracted
+// items land UNAPPROVED, same as uploadBrochure above — nothing reaches
+// the AI until a human confirms each one is actually correct.
+export async function extractKnowledgeFromWebsite(businessId: string, url: string): Promise<ActionResult> {
+  const trimmedUrl = url.trim();
+  if (!trimmedUrl) return { ok: false, message: "Enter a website URL." };
+
+  const fetched = await fetchWebsiteText(trimmedUrl);
+  if (!fetched.ok) return { ok: false, message: fetched.message };
+
+  const items = await extractKnowledgeItems(fetched.text);
+  if (items === null) {
+    return { ok: false, message: "Could not extract knowledge items from that page — please try again." };
+  }
+  if (items.length === 0) {
+    return { ok: false, message: "No extractable content found on that page." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("knowledge_items").insert(
+    items.map((item) => ({
+      business_id: businessId,
+      category: item.category,
+      question: null,
+      content: item.content,
+      media_url: null,
+      approved_at: null, // pending review — same gate as every other extracted source
+    })),
+  );
+  if (error) return { ok: false, message: "Could not save — check you have access to this business." };
+
+  revalidateKnowledgePaths(businessId);
+  return {
+    ok: true,
+    message: `Extracted ${items.length} item${items.length === 1 ? "" : "s"} from that page — review them below before they're used.`,
   };
 }
 

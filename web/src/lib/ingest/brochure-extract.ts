@@ -1,5 +1,4 @@
 import "server-only";
-import { PDFParse } from "pdf-parse";
 import { generateObject, NoObjectGeneratedError } from "ai";
 import { z } from "zod";
 
@@ -122,7 +121,17 @@ export async function extractKnowledgeGapQuestions(
   }
 }
 
+// Lazy/dynamic import, not a top-level one: `pdf-parse` (via `pdfjs-dist`)
+// references the browser-only `DOMMatrix` global at module-EVALUATION time,
+// not just when actually parsing a PDF. A top-level import here previously
+// crashed every /dashboard request with "DOMMatrix is not defined" — nothing
+// on that render path ever calls this function, but instagram.ts imports
+// extractKnowledgeItems from this same file, and /dashboard/page.tsx
+// imports instagram.ts, so the static import still got evaluated as part of
+// that shared server bundle. Deferring the import to call time means the
+// module is only ever loaded when a brochure is actually being parsed.
 export async function extractTextFromPdf(buffer: Buffer): Promise<string> {
+  const { PDFParse } = await import("pdf-parse");
   const parser = new PDFParse({ data: buffer });
   const result = await parser.getText();
   return result.text;

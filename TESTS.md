@@ -927,3 +927,78 @@ Founder request: extend the 30-day-history knowledge-base seed (DEV-21) so Engag
 | 2026-08-26 | Production health check post-deploy | e2e (real production) | Pass | `/` → 200, `/recover` → 200, `/dashboard/engage/knowledge` → 307 (expected login redirect, not a 500). |
 
 **Not deployed with a holdback guard** — same reasoning as DEV-25: `knowledge_gap_questions` is read via its own isolated query in `EngageKnowledgeView.tsx` (`gapQuestionRows ?? []`), never merged into the existing `knowledge_items` select, so nothing would have broken pre-migration. Not empirically re-tested pre-migration this time since the migration was applied first, directly, before any code touching the table was deployed — no window existed where deployed code could have hit a not-yet-existing table.
+
+## Website Knowledge Extraction (DEV-29)
+
+Founder question: would extracting knowledge from a business's own website (and social pages) help deepen the knowledge base, especially for a new business or one whose Instagram history has gone stale beyond the 30-day seed window (`DEV-21`)? Recommendation (website: yes, reuse the existing document-extraction prompt unchanged; social scraping: defer, ToS/App-Review risk for low data density; surface on the Knowledge Base page, not onboarding) presented in chat and confirmed before building. No new migration — reuses the existing `knowledge_items` table exactly like brochure upload.
+
+| Date | Test | Type | Result | Notes |
+|---|---|---|---|---|
+| 2026-08-30 | `tsc --noEmit` | build | Pass | Clean. |
+| 2026-08-30 | **SSRF guard, via a temporary route hit against a real local `next dev` server** — 6 cases: `http://127.0.0.1`, `http://localhost:3000`, `http://169.254.169.254/latest/meta-data/` (cloud metadata), `http://192.168.1.1`, `file:///etc/passwd`, and a malformed string (`not-a-url`) | integration (real network/DNS calls, not mocked) | Pass | All 6 refused with the correct, distinct error message ("That address isn't reachable" for the four IP cases, "Only http/https links are supported" for the bad scheme, "That doesn't look like a valid URL" for the malformed one) — none silently passed through. |
+| 2026-08-30 | Redirect handling — `http://capture.com.ng` (redirects to https) | integration (real network) | Pass | Refused with "That link redirects — please paste the exact final URL instead," not silently followed (a followed redirect's hostname would bypass the DNS check entirely). |
+| 2026-08-30 | Nonexistent domain — `https://this-domain-does-not-exist-xyz123.com` | integration (real DNS) | Pass | Failed cleanly at the DNS-resolution step with "Could not resolve that address," no crash. |
+| 2026-08-30 | **Full real pipeline against a real, live, unrelated page** — `https://capture.com.ng/find` | integration (real fetch + real model call) | Pass | Correctly extracted 6 real knowledge items (Find/Recover/Engage product descriptions, the audit FAQ, the privacy-consent policy) via `extractKnowledgeItems`, invented nothing. |
+| 2026-08-30 | Found and fixed a real bug during the above: hex HTML entities (`&#x27;`) weren't decoded, only decimal (`&#39;`) | bug found via inspection, not assumed | Fixed | Text preview showed a raw `&#x27;` in "we&#x27;ll collect". Added a generic hex/decimal numeric-entity decoder to `htmlToText`; re-ran the same URL and confirmed clean text ("we'll collect") afterward. |
+| 2026-08-30 | `eslint` | static | Pass | Same 3 unrelated pre-existing errors, none in new/changed files. |
+| 2026-08-30 | Real `next build` | build | Pass | Clean. |
+| 2026-08-30 | Deploy | — | — | `vercel --prod --yes`: `dpl_4XrqP5ByJtdtTNCUg9Z5xFv4GjBF`, aliased to `capture.com.ng`. |
+| 2026-08-30 | Production health check post-deploy | e2e (real production) | Pass | `/` → 200, `/dashboard/engage/knowledge` → 307 (expected login redirect, not a 500). |
+
+Temporary test route deleted immediately after use, same discipline as `DEV-28`'s real-model test.
+
+## Production Dashboard Outage — DOMMatrix Crash + Broken PDF Worker (DEV-30)
+
+Found while investigating the founder's mobile-optimization request. Every real, authenticated `/dashboard*` request had been returning 500 since `DEV-21` (2026-08-21) — 9 days, undetected by every prior deploy's health check, because those checks only ever hit `/dashboard` unauthenticated (a 307 redirect that never reaches the crashing code).
+
+| Date | Test | Type | Result | Notes |
+|---|---|---|---|---|
+| 2026-08-30 | `/dashboard` inside a same-origin iframe (mobile-audit technique) | integration (real production, real session) | **Found broken** | Iframe showed "500: This page couldn't load" — the established iframe-viewport technique's first real find of a genuine bug rather than a layout issue. |
+| 2026-08-30 | Corroboration: direct authenticated `fetch('/dashboard', {credentials:'include'})` from the same real logged-in browser session, no iframe involved | integration (real production, real session) | Confirmed broken | Status 500, `x-matched-path: "/500"`, `id="__next_error__"` in the response body — a structurally different check confirming the iframe result wasn't a framing artifact, per this project's own frontend-verification discipline. |
+| 2026-08-30 | Unauthenticated control check: `curl /dashboard` and `/dashboard/recover` with no session | integration (real production) | Pass (307) | Confirmed the crash is auth-path-specific, not a routing/build issue — this is exactly why every prior unauthenticated health check missed it. |
+| 2026-08-30 | `vercel logs` against the actual currently-serving deployment (had to correct from an older deployment URL) | integration (real production logs) | Root cause found | `ReferenceError: DOMMatrix is not defined`, firing on every real `/dashboard` hit since at least 15:44 UTC. Traced to `brochure-extract.ts`'s top-level `import { PDFParse } from "pdf-parse"`, pulled into `/dashboard`'s server bundle via `instagram.ts`. |
+| 2026-08-30 | Fix 1: lazy/dynamic `pdf-parse` import inside `extractTextFromPdf()` — real local production build (`next build && next start`), fetched a route importing the exact same module chain as `/dashboard/page.tsx` | integration (real prod build) | Pass | `{"ok":true,"importedFn":"function"}` — import no longer throws. |
+| 2026-08-30 | Testing Fix 1 surfaced a second, independent bug: calling `extractTextFromPdf` against a real test PDF failed with `Cannot find module '.../pdf.worker.mjs'` | integration (real prod build, real PDF) | **Found broken** | A synthetically-generated but real, valid single-page PDF (`%PDF-1.1`, real content stream). Root cause: Next's server bundler rewrites `pdf-parse`'s relative-path worker reference when bundled. This means brochure upload has likely never actually worked in production since it shipped. |
+| 2026-08-30 | Fix 2: `serverExternalPackages: ["pdf-parse"]` added to `next.config.ts`; re-ran the same real-PDF test against a fresh production build | integration (real prod build, real PDF) | Pass | `{"ok":true,"text":"Hello Capture test PDF\n\n-- 1 of 1 --\n\n"}` — correct real extracted text, not a guess. |
+| 2026-08-30 | `tsc --noEmit` | build | Pass | Clean (after regenerating `.next/types` post-cleanup of temporary test routes). |
+| 2026-08-30 | Deploy | — | — | `vercel --prod --yes`: `dpl_5oQAmJmULg29NpPbiGDnhJBKzK1n`, aliased to `capture.com.ng`. |
+| 2026-08-30 | **Post-deploy verification against the real, live, authenticated founder session** (not a redirect check) — all 5 previously-crashing routes | e2e (real production, real session) | Pass | `/dashboard`, `/dashboard/engage`, `/dashboard/engage/knowledge`, `/dashboard/recover`, `/dashboard/settings` all → 200. |
+
+Both temporary test routes deleted immediately after use. **Process lesson**: every prior deploy's "production health check passed" in this document tested `/dashboard` only unauthenticated — going forward, any dashboard/admin-area deploy needs at least one real authenticated request in its health check, not just confirmation that the login redirect fires.
+
+## Auth: Magic Link → Typed Code (DEV-31)
+
+Founder asked which was better for this audience (magic link vs. a typed code) and to implement the recommendation. Given: switch to a typed 6-digit code, closing the link-prescan-consumption failure mode and matching this audience's OTP familiarity. Confirmed via `AskUserQuestion` before building, given this touches every user's ability to log in.
+
+| Date | Test | Type | Result | Notes |
+|---|---|---|---|---|
+| 2026-08-30 | `tsc --noEmit` | build | Pass | Clean. |
+| 2026-08-30 | Supabase auth config applied directly (`PATCH /config/auth`), then re-read to confirm | integration (real production config) | Pass | `mailer_otp_length: 6`, `mailer_templates_magic_link_content` confirmed to contain only `{{ .Token }}`, no `{{ .ConfirmationURL }}`. |
+| 2026-08-30 | **Real end-to-end OTP flow**, via a temporary route using `supabase.auth.admin.generateLink()` (service-role) to get a real code without needing an email inbox, then `verifyOtp({ email, token, type: "email" })` from a plain client — the exact call `verifyLoginCode` uses | integration (real Supabase auth, real production build) | Pass | Real session established (`hasSession: true`), real user id returned. Test user deleted after. |
+| 2026-08-30 | **Negative case**: a wrong code against the same real OTP record, checked before and after the real code was redeemed | integration (real Supabase auth) | Pass | Wrong code rejected with a real error (`"Token has expired or is invalid"`), no session created; the correct code still worked immediately afterward — confirms a guess attempt doesn't consume or invalidate the real code. |
+| 2026-08-30 | Both OTP tests run against a real local production build (`next build && next start`), not `next dev` | build | Pass | Matches this project's standing practice of testing auth-critical paths against production-equivalent bundling, not dev mode. |
+| 2026-08-30 | `eslint` | static | Pass | Same 3 unrelated pre-existing errors, none in new/changed files. |
+| 2026-08-30 | Deploy | — | — | `vercel --prod --yes`: `dpl_DUFmTCWAcRgRbtWzZ9xf9svohNdG`, aliased to `capture.com.ng`. |
+| 2026-08-30 | **Live production check via the real browser** (not `curl` — this page is client-rendered behind a `useSearchParams` Suspense boundary, same limitation documented in `DEV-26`) | e2e (real production) | Pass | `/login`'s actual rendered page shows "We'll email you a 6-digit code" and a "Send code" button. |
+| 2026-08-30 | Re-ran `DEV-30`'s real authenticated dashboard check after this deploy too | e2e (real production, real session) | Pass | All 5 dashboard routes + `/admin` still return 200 — confirms this deploy didn't regress the outage fix from earlier the same session. |
+
+Temporary test route deleted immediately after use.
+
+## Mobile Audit Completion — Real Non-Admin Session + Overflow Fix (DEV-32)
+
+The original ask this session: ensure mobile is properly optimized across the public funnel and "dashboards and all other areas clients interact with." The founder's own live session is a platform admin, which redirects every `/dashboard*` path to `/admin` — so testing the actual business-owner dashboard views required a real, throwaway, non-admin business account.
+
+| Date | Test | Type | Result | Notes |
+|---|---|---|---|---|
+| 2026-08-30 | Public funnel (`/`, `/find`, `/signup`, `/login`, `/recover`) at a real 390px viewport, same-origin-iframe technique | integration (real production) | Pass | Zero horizontal overflow, zero offscreen elements across all five pages, checked numerically (`scrollWidth` vs `innerWidth`, `getBoundingClientRect`). |
+| 2026-08-30 | `/admin`'s business-list table, first pass (broad "any element wider than viewport" check) | integration (real production, real session) | **False positive** | Flagged as broken. |
+| 2026-08-30 | `/admin`'s table, second pass — checked the actual wrapper element's `overflow-x` | integration (real production, real session) | Corrected | `.table__scroll` div already wraps it with `overflow-x: auto`, constrained to viewport width — a deliberate, already-correct pattern. Audit methodology fixed (skip elements inside a scrollable ancestor) before trusting further results, per this project's corroborate-before-trusting-a-surprising-result discipline. |
+| 2026-08-30 | Created a real, throwaway, non-admin test business via `supabase.auth.admin.generate_link()` (top-level `redirect_to`, not nested under `options` — confirmed the nested form is silently ignored) → navigated to the real verification link → completed the real `/onboarding` flow | integration (real Supabase auth + real production onboarding flow) | Pass | Landed on a genuine business-owner `/dashboard`, not an admin one. |
+| 2026-08-30 | `/dashboard`, `/dashboard/engage`, `/dashboard/recover`, `/dashboard/settings` at 390px, real non-admin session | integration (real production, real session) | Pass | Zero overflow on all four. |
+| 2026-08-30 | `/dashboard/engage/knowledge` at 390px, real non-admin session | integration (real production, real session) | **Found broken** | `scrollWidth: 485` vs `viewportWidth: 390` (95px overflow) — two collapsed-toggle buttons ("Have several products...", "Have a brochure...") rendering as long non-wrapping single-line text. |
+| 2026-08-30 | Fix: `maxWidth`/`whiteSpace: normal`/`textAlign: left`/`height: auto`/`paddingBlock` added to those two toggle buttons plus `WebsiteExtractForm`'s (same idiom, same latent risk) | build | Pass | `tsc`, `eslint` (same 3 unrelated pre-existing errors), `next build` all clean. |
+| 2026-08-30 | Deploy | — | — | `vercel --prod --yes`: `dpl_2Y8chd9PP1xoGta6Y2DJ4AcyfSwP`. |
+| 2026-08-30 | Re-verified `/dashboard/engage/knowledge` at 390px, same real non-admin session, against production | e2e (real production, real session) | Pass | `overflowX: 0`, `scrollWidth === viewportWidth`. |
+| 2026-08-30 | Cleanup | — | — | Test business ("Mobile Audit Test Biz") deleted via direct SQL; throwaway auth user deleted via Admin API. Both confirmed gone. |
+
+**Not fixed, logged as minor**: several nav/footer links and two dashboard buttons render under the ~44px tap-target height sometimes recommended for touch UIs — common across most of the web, not a real functional bug, no special-cased fix applied.

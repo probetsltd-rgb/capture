@@ -1,13 +1,16 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { uploadBrochure } from "./actions";
+import { extractKnowledgeFromWebsite } from "./actions";
 
-// Collapsed by default, same reasoning as BulkAddForm — this is an opt-in
-// path for a business that already has a document, not the default way to
-// add knowledge.
-export function BrochureUploadForm({ businessId }: { businessId: string }) {
+// Collapsed by default, same reasoning as BrochureUploadForm/BulkAddForm —
+// opt-in, not the default way to add knowledge. Especially useful for a
+// business with an empty knowledge base (new, or history gone stale
+// beyond the 30-day seed window), but shown here unconditionally like the
+// brochure upload rather than gated on that state.
+export function WebsiteExtractForm({ businessId }: { businessId: string }) {
   const [open, setOpen] = useState(false);
+  const [url, setUrl] = useState("");
   const [pending, startTransition] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
   const [ok, setOk] = useState(true);
@@ -27,7 +30,7 @@ export function BrochureUploadForm({ businessId }: { businessId: string }) {
           paddingBlock: "var(--s3)",
         }}
       >
-        Have a brochure or price list already? Upload it →
+        Have a website? Check it for starting facts →
       </button>
     );
   }
@@ -35,23 +38,31 @@ export function BrochureUploadForm({ businessId }: { businessId: string }) {
   return (
     <form
       style={{ margin: "1rem 0", display: "flex", flexDirection: "column", gap: "0.5rem", maxWidth: 500 }}
-      action={(formData: FormData) =>
+      onSubmit={(e) => {
+        e.preventDefault();
         startTransition(async () => {
-          const result = await uploadBrochure(businessId, formData);
+          const result = await extractKnowledgeFromWebsite(businessId, url);
           setOk(result.ok);
           setMessage(result.message);
-        })
-      }
+        });
+      }}
     >
       <p className="meta">
-        PDF or plain text. The AI reads it and proposes individual knowledge items — nothing is used until
-        you review and approve each one below, same as everything else here.
+        Paste your website&apos;s URL. The AI reads the page and proposes individual knowledge items —
+        nothing is used until you review and approve each one below, same as everything else here.
       </p>
-      <input type="file" name="brochure" accept="application/pdf,text/plain" required />
+      <input
+        type="url"
+        name="url"
+        placeholder="https://yourbusiness.com"
+        value={url}
+        onChange={(e) => setUrl(e.target.value)}
+        required
+      />
       {message && <p className={ok ? "notice" : "notice notice--error"}>{message}</p>}
       <span style={{ display: "inline-flex", gap: "var(--s3)" }}>
         <button type="submit" disabled={pending}>
-          {pending ? "Reading document…" : "Extract knowledge items"}
+          {pending ? "Reading page…" : "Extract knowledge items"}
         </button>
         <button type="button" disabled={pending} onClick={() => setOpen(false)}>
           Cancel

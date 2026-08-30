@@ -6,9 +6,9 @@ Capture is a revenue-execution platform for established, already-trading Nigeria
 
 - **Engage** — responds instantly to Instagram DM enquiries, qualifies them (name, product, timing), and escalates anything sensitive (price negotiation, complaints, unusual requests) to a person instead of guessing. WhatsApp ingestion is planned but not yet available. New customers get a 7-day free trial that starts with a baseline built from their last 30 days of real conversations.
 - **Find** — reads a business's existing WhatsApp conversations and prices the revenue sitting in enquiries that went unanswered or unfollowed-up. Free, and does not require Engage.
-- **Recover** — ranks a business's dormant leads and past customers, times outreach to each opportunity, and stops automatically the moment someone replies. Also independent of Engage.
+- **Recover** — ranks a business's dormant leads and past customers, times outreach to each opportunity, and stops automatically the moment someone replies. Independent of Engage, but requires Find's report first — Find is what brings a business's conversation history in.
 
-A customer never needs one product to use another — Engage, Find, and Recover are each useful on their own.
+Engage and Find are each independently useful without the other. Recover is the one exception: it needs Find's conversation-history report as a prerequisite before it can function.
 
 ## Key pages
 

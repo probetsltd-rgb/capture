@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { KnowledgeForm } from "./KnowledgeForm";
 import { BulkAddForm } from "./BulkAddForm";
 import { BrochureUploadForm } from "./BrochureUploadForm";
+import { WebsiteExtractForm } from "./WebsiteExtractForm";
 import { DeleteButton } from "./DeleteButton";
 import { ApproveButton } from "./ApproveButton";
 import { CompletenessToggle } from "./CompletenessToggle";
@@ -76,6 +77,7 @@ export async function EngageKnowledgeView({
       <KnowledgeForm businessId={businessId} />
       <BulkAddForm businessId={businessId} />
       <BrochureUploadForm businessId={businessId} />
+      <WebsiteExtractForm businessId={businessId} />
 
       <KnowledgeGapQuestions businessId={businessId} questions={gapQuestions} />
 

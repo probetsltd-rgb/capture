@@ -16,7 +16,19 @@ export function BulkAddForm({ businessId }: { businessId: string }) {
 
   if (!open) {
     return (
-      <button type="button" className="btn" onClick={() => setOpen(true)} style={{ marginTop: "var(--s3)" }}>
+      <button
+        type="button"
+        className="btn"
+        onClick={() => setOpen(true)}
+        style={{
+          marginTop: "var(--s3)",
+          maxWidth: "100%",
+          whiteSpace: "normal",
+          textAlign: "left",
+          height: "auto",
+          paddingBlock: "var(--s3)",
+        }}
+      >
         Have several products or a price list? Add multiple at once →
       </button>
     );
