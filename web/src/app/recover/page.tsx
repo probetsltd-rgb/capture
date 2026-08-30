@@ -2,6 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { SiteNav, SiteFooter } from "@/components/SiteChrome";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { FaqSection } from "@/components/FaqSection";
+import { buildFaqJsonLd } from "@/lib/seo/faq-jsonld";
+import { RECOVER_FAQS } from "./faq-data";
 
 export const metadata: Metadata = {
   title: "Recover",
@@ -37,6 +40,10 @@ export default async function RecoverPage() {
 
   return (
     <div className="page">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(buildFaqJsonLd(RECOVER_FAQS)) }}
+      />
       <SiteNav />
 
       <main>
@@ -166,6 +173,8 @@ export default async function RecoverPage() {
             </div>
           </section>
         )}
+
+        <FaqSection heading="Questions people actually ask." faqs={RECOVER_FAQS} />
 
         <section className="band band--ruled">
           <div className="shell cta">

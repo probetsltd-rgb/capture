@@ -1002,3 +1002,19 @@ The original ask this session: ensure mobile is properly optimized across the pu
 | 2026-08-30 | Cleanup | — | — | Test business ("Mobile Audit Test Biz") deleted via direct SQL; throwaway auth user deleted via Admin API. Both confirmed gone. |
 
 **Not fixed, logged as minor**: several nav/footer links and two dashboard buttons render under the ~44px tap-target height sometimes recommended for touch UIs — common across most of the web, not a real functional bug, no special-cased fix applied.
+
+## FAQ + FAQPage Structured Data on /find and /recover (DEV-33)
+
+Founder asked to build an FAQ for both pages, following up on the organic-discovery suggestion given earlier the same day. Every answer grounded in real facts already established elsewhere in the codebase (`privacy/page.tsx`, the upload flow's real accepted formats, `/recover`'s own existing copy) — none invented for this task.
+
+| Date | Test | Type | Result | Notes |
+|---|---|---|---|---|
+| 2026-08-30 | `tsc --noEmit` | build | Pass | Clean. |
+| 2026-08-30 | `eslint` | static | Pass | Same 3 unrelated pre-existing errors, none in new/changed files. |
+| 2026-08-30 | Real local production build (`next build && next start`), fetched both pages | build | Pass | `/find` and `/recover` both render the new FAQ content in the raw HTML — both are (partly) statically/server-rendered, unlike `/login`'s client-only render. |
+| 2026-08-30 | Parsed the actual embedded `application/ld+json` script tags from both pages' real HTML | integration (real rendered output) | Pass | Valid, well-formed `FAQPage` schema — 6 questions on `/find`, 5 on `/recover` — content matches the visible accordion exactly (same source array feeds both). |
+| 2026-08-30 | Accordion open/close, real browser | e2e (real local render) | Pass (after one false start) | A raw mouse click at screenshot coordinates appeared not to toggle it — corroborated with a direct DOM `.click()` on the `<summary>` element, which correctly flipped `details.open` `false → true`; a follow-up screenshot confirmed the triangle and answer text render correctly open. The mouse-click miss was a screenshot-coordinate precision quirk, not a product bug. |
+| 2026-08-30 | Deploy | — | — | `vercel --prod --yes`: `dpl_DwA31jr4eS9EtPfnxybzYz7pbejR`. |
+| 2026-08-30 | Production check | e2e (real production) | Pass | Both pages return the expected FAQ text and `FAQPage` type live; `/` → 200, `/dashboard` (unauth) → 307. |
+
+**Bonus fix found while in `find/layout.tsx`**: its metadata description still said "in about a minute" — stale since the on-page copy was corrected to the real 10–15 minute figure in `DEV-26`; fixed in the same deploy.

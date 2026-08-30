@@ -3,12 +3,14 @@
 import { useActionState } from "react";
 import Link from "next/link";
 import { SiteNav, SiteFooter } from "@/components/SiteChrome";
+import { FaqSection } from "@/components/FaqSection";
 import { submitIntake, type IntakeState } from "./actions";
 import {
   INDUSTRIES,
   REVENUE_BUCKETS,
   CONVERSATION_VOLUME_BUCKETS,
 } from "./constants";
+import { FIND_FAQS } from "./faq-data";
 
 const initialState: IntakeState = { status: "idle", message: null };
 
@@ -185,6 +187,8 @@ export default function FindPage() {
             </div>
           </div>
         </div>
+
+        <FaqSection heading="Questions people actually ask." faqs={FIND_FAQS} />
       </main>
 
       <SiteFooter />
