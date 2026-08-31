@@ -149,6 +149,33 @@ export async function fetchProfile(accessToken: string): Promise<ProfileResponse
   return response.json();
 }
 
+// The real, missing piece behind "connected but never receives messages"
+// (2026-08-31 — found via a real founder connect + real test DM producing
+// zero webhook hits in prod logs). OAuth consent alone does not enrol an
+// account for webhook delivery: Meta requires this separate, explicit
+// per-account subscribe call after every connect (verified against Meta's
+// current Instagram Platform webhooks docs, 2026-08-31 — same "don't trust
+// memory" discipline as the rest of this file). Earlier testing against
+// `rentit_online` never hit this gap because that account's subscription
+// was toggled on manually from the Meta App Dashboard's tester tooling —
+// a path a real, non-tester Capture business has no access to; this call
+// is what a real OAuth-connected business needs instead.
+export async function subscribeToWebhooks(accessToken: string, igUserId: string): Promise<void> {
+  const url = new URL(`https://graph.instagram.com/v25.0/${igUserId}/subscribed_apps`);
+  url.searchParams.set("subscribed_fields", "messages");
+  url.searchParams.set("access_token", accessToken);
+
+  const response = await fetch(url.toString(), { method: "POST" });
+  const bodyText = await response.text();
+  if (!response.ok) {
+    throw new Error(`Instagram webhook subscribe failed: ${response.status} ${bodyText}`);
+  }
+  const parsed = JSON.parse(bodyText);
+  if (parsed?.success !== true) {
+    throw new Error(`Instagram webhook subscribe: unexpected response — ${bodyText}`);
+  }
+}
+
 // Historical message retrieval (PLANS.md Phase 5.2 — 30-day baseline).
 // Verified directly against the real, live `rentit_online` connection
 // 2026-08-15 before writing this — not assumed from docs, given how

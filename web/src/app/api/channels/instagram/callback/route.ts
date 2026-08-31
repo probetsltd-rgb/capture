@@ -5,6 +5,7 @@ import {
   exchangeCodeForShortLivedToken,
   exchangeForLongLivedToken,
   fetchProfile,
+  subscribeToWebhooks,
 } from "@/lib/channels/instagram-api";
 import { saveInstagramConnection, fetchHistoricalMessages } from "@/lib/channels/instagram";
 import { after } from "next/server";
@@ -97,6 +98,20 @@ export async function GET(request: NextRequest) {
     }
 
     const profile = await fetchProfile(usableToken);
+
+    // Without this, OAuth consent alone leaves the account connected but
+    // never actually receiving messages — the real gap found 2026-08-31
+    // (a real founder connect + real test DM produced zero webhook hits in
+    // prod). Deliberately blocks saving the connection on failure rather
+    // than degrading like the long-lived-token exchange above: there's no
+    // fallback that makes a connection useful without this, unlike that
+    // case's still-functional short-lived token.
+    try {
+      await subscribeToWebhooks(usableToken, profile.user_id);
+    } catch (err) {
+      console.error("Instagram webhook subscribe failed", err);
+      return redirectToDashboard(request, "error", "subscribe_failed");
+    }
 
     await saveInstagramConnection({
       businessId: ownBusinessId,
