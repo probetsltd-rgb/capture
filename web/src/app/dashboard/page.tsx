@@ -321,7 +321,43 @@ export default async function DashboardPage({
               }))}
             />
           )}
-          <table className="table">
+          {/* Moved out of the stats table and given real visual weight
+              2026-08-31 — a founder testing Connect end-to-end for the
+              first time on a non-tester account found it as a plain text
+              link buried three rows down, easy to miss on the exact
+              account (freshly onboarded, nothing connected yet) that most
+              needs it. The account-type note is here, not just in the
+              FAQ, because it's the actual failure mode that prompted
+              this: Instagram's own OAuth silently dead-ends (no
+              permission screen, no redirect back) for a Personal account
+              instead of surfacing an error — see /api/channels/instagram/
+              callback's zero-hit prod logs from that test. */}
+          {!instagramConnection.connected && (
+            <div
+              style={{
+                marginTop: "var(--s4)",
+                padding: "var(--s5)",
+                border: "1px solid var(--rule)",
+                borderRadius: "var(--radius)",
+                background: "var(--paper)",
+              }}
+            >
+              <h3 className="h3">Connect Instagram to start</h3>
+              <p className="body" style={{ marginTop: "var(--s2)" }}>
+                Engage can&apos;t receive or answer enquiries until Instagram is connected. Needs a
+                Professional Instagram account — Business or Creator, not Personal —{" "}
+                <Link href="/#faq">more in the FAQ →</Link>.
+              </p>
+              <Link
+                href="/api/channels/instagram/connect"
+                className="btn btn--primary"
+                style={{ marginTop: "var(--s4)", display: "inline-block" }}
+              >
+                Connect Instagram →
+              </Link>
+            </div>
+          )}
+          <table className="table" style={{ marginTop: "var(--s5)" }}>
             <tbody>
               <tr>
                 <td >Enquiries received</td>
@@ -349,7 +385,7 @@ export default async function DashboardPage({
                       <DisconnectInstagramButton businessId={businessId} />
                     </span>
                   ) : (
-                    <Link href="/api/channels/instagram/connect">Connect Instagram →</Link>
+                    "Not connected"
                   )}
                 </td>
               </tr>

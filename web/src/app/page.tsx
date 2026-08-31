@@ -2,7 +2,10 @@ import Link from "next/link";
 import { SiteNav, SiteFooter } from "@/components/SiteChrome";
 import { ScrollReveal } from "@/components/ScrollReveal";
 import { EngageResponseDemo } from "@/components/EngageResponseDemo";
+import { FaqSection } from "@/components/FaqSection";
+import { buildFaqJsonLd } from "@/lib/seo/faq-jsonld";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { HOME_FAQS } from "./faq-data";
 
 // Engage-first homepage rebuild (Capture_PRD_Addendum_v2.md §2, §28;
 // PLANS.md Phase 5.7) — replaces the previous Find-led version, which
@@ -90,6 +93,10 @@ export default async function Home() {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareApplicationJsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(buildFaqJsonLd(HOME_FAQS)) }}
       />
       <ScrollReveal />
       <SiteNav />
@@ -376,6 +383,8 @@ export default async function Home() {
             </div>
           </div>
         </section>
+
+        <FaqSection heading="Questions people actually ask." faqs={HOME_FAQS} />
 
         {/* ------------------------------------------------------- cta --- */}
         <section className="band band--ruled band--ink">
