@@ -20,8 +20,9 @@ export function KnowledgeGapQuestions({
   if (questions.length === 0) return null;
 
   return (
-    <section style={{ margin: "1.5rem 0", padding: "1rem", border: "1px solid var(--rule)", borderRadius: 4 }}>
-      <h2 style={{ marginTop: 0 }}>A few questions to strengthen your knowledge base</h2>
+    <div className="panel" style={{ marginTop: "var(--s5)" }}>
+      <div className="panel__body">
+      <h2 className="h3" style={{ marginTop: 0 }}>A few questions to strengthen your knowledge base</h2>
       <p className="meta">
         Based on your past replies, the AI noticed these weren&apos;t fully covered. Answer what you can — each
         answer is used right away. Skip anything that doesn&apos;t apply.
@@ -31,7 +32,8 @@ export function KnowledgeGapQuestions({
           <GapQuestionRow key={q.id} businessId={businessId} question={q} />
         ))}
       </ul>
-    </section>
+      </div>
+    </div>
   );
 }
 
@@ -53,10 +55,12 @@ function GapQuestionRow({ businessId, question }: { businessId: string; question
           onChange={(e) => setAnswer(e.target.value)}
           placeholder="Your answer"
           disabled={pending}
+          className="input"
           style={{ flex: "1 1 auto" }}
         />
         <button
           disabled={pending || !answer.trim()}
+          className="btn btn--primary"
           onClick={() =>
             startTransition(async () => {
               const result = await answerKnowledgeGapQuestion(businessId, question.id, answer);
@@ -69,6 +73,7 @@ function GapQuestionRow({ businessId, question }: { businessId: string; question
         </button>
         <button
           disabled={pending}
+          className="btn"
           onClick={() =>
             startTransition(async () => {
               const result = await dismissKnowledgeGapQuestion(businessId, question.id);

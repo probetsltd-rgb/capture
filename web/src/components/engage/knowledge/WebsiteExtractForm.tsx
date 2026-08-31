@@ -36,38 +36,44 @@ export function WebsiteExtractForm({ businessId }: { businessId: string }) {
   }
 
   return (
-    <form
-      style={{ margin: "1rem 0", display: "flex", flexDirection: "column", gap: "0.5rem", maxWidth: 500 }}
-      onSubmit={(e) => {
-        e.preventDefault();
-        startTransition(async () => {
-          const result = await extractKnowledgeFromWebsite(businessId, url);
-          setOk(result.ok);
-          setMessage(result.message);
-        });
-      }}
-    >
-      <p className="meta">
-        Paste your website&apos;s URL. The AI reads the page and proposes individual knowledge items —
-        nothing is used until you review and approve each one below, same as everything else here.
-      </p>
-      <input
-        type="url"
-        name="url"
-        placeholder="https://yourbusiness.com"
-        value={url}
-        onChange={(e) => setUrl(e.target.value)}
-        required
-      />
-      {message && <p className={ok ? "notice" : "notice notice--error"}>{message}</p>}
-      <span style={{ display: "inline-flex", gap: "var(--s3)" }}>
-        <button type="submit" disabled={pending}>
-          {pending ? "Reading page…" : "Extract knowledge items"}
-        </button>
-        <button type="button" disabled={pending} onClick={() => setOpen(false)}>
-          Cancel
-        </button>
-      </span>
-    </form>
+    <div className="panel" style={{ marginTop: "var(--s4)" }}>
+      <div className="panel__body">
+        <form
+          className="form"
+          style={{ maxWidth: 500 }}
+          onSubmit={(e) => {
+            e.preventDefault();
+            startTransition(async () => {
+              const result = await extractKnowledgeFromWebsite(businessId, url);
+              setOk(result.ok);
+              setMessage(result.message);
+            });
+          }}
+        >
+          <p className="meta">
+            Paste your website&apos;s URL. The AI reads the page and proposes individual knowledge items —
+            nothing is used until you review and approve each one below, same as everything else here.
+          </p>
+          <input
+            type="url"
+            name="url"
+            placeholder="https://yourbusiness.com"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            required
+            className="input"
+          />
+          {message && <p className={ok ? "notice" : "notice notice--error"}>{message}</p>}
+          <span style={{ display: "inline-flex", gap: "var(--s3)" }}>
+            <button type="submit" disabled={pending} className="btn btn--primary">
+              {pending ? "Reading page…" : "Extract knowledge items"}
+            </button>
+            <button type="button" disabled={pending} onClick={() => setOpen(false)} className="btn">
+              Cancel
+            </button>
+          </span>
+        </form>
+      </div>
+    </div>
   );
 }

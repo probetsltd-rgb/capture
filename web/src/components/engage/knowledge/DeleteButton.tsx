@@ -8,12 +8,12 @@ export function DeleteButton({ businessId, itemId }: { businessId: string; itemI
   return (
     <button
       disabled={pending}
+      className="btn"
       onClick={() =>
         startTransition(async () => {
           await deleteKnowledgeItem(businessId, itemId);
         })
       }
-
     >
       Delete
     </button>

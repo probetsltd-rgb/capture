@@ -33,30 +33,35 @@ export function BrochureUploadForm({ businessId }: { businessId: string }) {
   }
 
   return (
-    <form
-      style={{ margin: "1rem 0", display: "flex", flexDirection: "column", gap: "0.5rem", maxWidth: 500 }}
-      action={(formData: FormData) =>
-        startTransition(async () => {
-          const result = await uploadBrochure(businessId, formData);
-          setOk(result.ok);
-          setMessage(result.message);
-        })
-      }
-    >
-      <p className="meta">
-        PDF or plain text. The AI reads it and proposes individual knowledge items — nothing is used until
-        you review and approve each one below, same as everything else here.
-      </p>
-      <input type="file" name="brochure" accept="application/pdf,text/plain" required />
-      {message && <p className={ok ? "notice" : "notice notice--error"}>{message}</p>}
-      <span style={{ display: "inline-flex", gap: "var(--s3)" }}>
-        <button type="submit" disabled={pending}>
-          {pending ? "Reading document…" : "Extract knowledge items"}
-        </button>
-        <button type="button" disabled={pending} onClick={() => setOpen(false)}>
-          Cancel
-        </button>
-      </span>
-    </form>
+    <div className="panel" style={{ marginTop: "var(--s4)" }}>
+      <div className="panel__body">
+        <form
+          className="form"
+          style={{ maxWidth: 500 }}
+          action={(formData: FormData) =>
+            startTransition(async () => {
+              const result = await uploadBrochure(businessId, formData);
+              setOk(result.ok);
+              setMessage(result.message);
+            })
+          }
+        >
+          <p className="meta">
+            PDF or plain text. The AI reads it and proposes individual knowledge items — nothing is used until
+            you review and approve each one below, same as everything else here.
+          </p>
+          <input type="file" name="brochure" accept="application/pdf,text/plain" required />
+          {message && <p className={ok ? "notice" : "notice notice--error"}>{message}</p>}
+          <span style={{ display: "inline-flex", gap: "var(--s3)" }}>
+            <button type="submit" disabled={pending} className="btn btn--primary">
+              {pending ? "Reading document…" : "Extract knowledge items"}
+            </button>
+            <button type="button" disabled={pending} onClick={() => setOpen(false)} className="btn">
+              Cancel
+            </button>
+          </span>
+        </form>
+      </div>
+    </div>
   );
 }

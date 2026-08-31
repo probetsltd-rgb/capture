@@ -61,18 +61,16 @@ export async function EngageKnowledgeView({
       </p>
       <h1>Approved knowledge — {business.name}</h1>
       <p className="meta">
-        The response engine only answers from what&apos;s approved here (PRD §17B). Nothing else, ever.
-      </p>
-      <p className="meta">
-        Add one entry per product, price, policy, or fact — as many as you need, there&apos;s no fixed set
-        to fill in. If you sell several products, add each one separately with its own price and
-        variants included, rather than listing prices on their own.
+        The AI only answers from what&apos;s approved here — nothing else, ever. Add one entry per
+        product, price, policy, or fact; list variants and prices together rather than on their own.
       </p>
 
-      <CompletenessToggle
-        businessId={businessId}
-        confirmedCompleteAt={business.knowledge_base_confirmed_complete_at as string | null}
-      />
+      {approved.length > 0 && (
+        <CompletenessToggle
+          businessId={businessId}
+          confirmedCompleteAt={business.knowledge_base_confirmed_complete_at as string | null}
+        />
+      )}
 
       <KnowledgeForm businessId={businessId} />
       <BulkAddForm businessId={businessId} />
@@ -82,44 +80,58 @@ export async function EngageKnowledgeView({
       <KnowledgeGapQuestions businessId={businessId} questions={gapQuestions} />
 
       {pending.length > 0 && (
-        <section style={{ margin: "1.5rem 0", padding: "1rem", border: "1px solid #a60", borderRadius: 4 }}>
-          <h2 style={{ marginTop: 0 }}>Needs your review ({pending.length})</h2>
-          <p className="meta">
-            These came from an industry starter template or an uploaded document. They are{" "}
-            <strong>suggestions, not facts</strong> — the AI will not use any of them until you confirm each one
-            is correct for your business. Edit is not supported yet: delete anything that&apos;s wrong and add
-            your own version above.
-          </p>
+        <div className="panel" style={{ marginTop: "var(--s6)", borderColor: "#e0b070" }}>
+          <div className="panel__head">
+            <h2 className="h3" style={{ margin: 0 }}>Needs your review ({pending.length})</h2>
+          </div>
+          <div className="panel__body">
+            <p className="meta">
+              These came from an industry starter template or an uploaded document. They are{" "}
+              <strong>suggestions, not facts</strong> — the AI will not use any of them until you confirm each one
+              is correct for your business. Edit is not supported yet: delete anything that&apos;s wrong and add
+              your own version above.
+            </p>
+            <ul style={{ listStyle: "none", padding: 0, marginTop: "var(--s3)" }}>
+              {pending.map((item) => (
+                <li key={item.id} style={{ borderBottom: "1px solid var(--rule)", padding: "var(--s3) 0" }}>
+                  <strong>[{item.category}]</strong> {item.question && <em>{item.question} — </em>}
+                  {item.content}
+                  {item.media_url && <span className="meta"> 📎 media attached</span>}
+                  <span style={{ display: "inline-flex", gap: "var(--s3)", marginLeft: "var(--s3)" }}>
+                    <ApproveButton businessId={businessId} itemId={item.id} />
+                    <DeleteButton businessId={businessId} itemId={item.id} />
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
+
+      <div className="panel" style={{ marginTop: "var(--s6)" }}>
+        <div className="panel__head">
+          <h2 className="h3" style={{ margin: 0 }}>In use by the AI ({approved.length})</h2>
+        </div>
+        <div className="panel__body">
           <ul style={{ listStyle: "none", padding: 0 }}>
-            {pending.map((item) => (
+            {approved.map((item) => (
               <li key={item.id} style={{ borderBottom: "1px solid var(--rule)", padding: "var(--s3) 0" }}>
                 <strong>[{item.category}]</strong> {item.question && <em>{item.question} — </em>}
                 {item.content}
-                {item.media_url && <span className="meta"> 📎 media attached</span>}{" "}
-                <ApproveButton businessId={businessId} itemId={item.id} />{" "}
-                <DeleteButton businessId={businessId} itemId={item.id} />
+                {item.media_url && <span className="meta"> 📎 media attached</span>}
+                <span style={{ marginLeft: "var(--s3)" }}>
+                  <DeleteButton businessId={businessId} itemId={item.id} />
+                </span>
               </li>
             ))}
+            {approved.length === 0 && (
+              <li className="meta">
+                Nothing approved yet — the AI cannot answer any question until at least one item is approved.
+              </li>
+            )}
           </ul>
-        </section>
-      )}
-
-      <h2>In use by the AI ({approved.length})</h2>
-      <ul style={{ listStyle: "none", padding: 0 }}>
-        {approved.map((item) => (
-          <li key={item.id} style={{ borderBottom: "1px solid var(--rule)", padding: "var(--s3) 0" }}>
-            <strong>[{item.category}]</strong> {item.question && <em>{item.question} — </em>}
-            {item.content}
-            {item.media_url && <span className="meta"> 📎 media attached</span>}{" "}
-            <DeleteButton businessId={businessId} itemId={item.id} />
-          </li>
-        ))}
-        {approved.length === 0 && (
-          <li className="meta">
-            Nothing approved yet — the AI cannot answer any question until at least one item is approved.
-          </li>
-        )}
-      </ul>
+        </div>
+      </div>
     </main>
   );
 }

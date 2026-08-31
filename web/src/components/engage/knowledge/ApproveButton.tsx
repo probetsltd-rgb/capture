@@ -11,13 +11,13 @@ export function ApproveButton({ businessId, itemId }: { businessId: string; item
     <>
       <button
         disabled={pending}
+        className="btn btn--primary"
         onClick={() =>
           startTransition(async () => {
             const result = await approveKnowledgeItem(businessId, itemId);
             setError(result.ok ? null : result.message);
           })
         }
-
       >
         {pending ? "Approving…" : "Approve"}
       </button>
