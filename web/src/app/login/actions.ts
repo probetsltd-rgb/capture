@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { safeNextPath } from "@/lib/safe-redirect";
+import type { RequestCodeState, VerifyCodeState } from "@/app/login/state";
 
 // Founder decision 2026-08-30: switched from a clickable magic link to a
 // typed 6-digit code. Two real reasons: (1) corporate/Gmail link-prescanning
@@ -19,12 +20,6 @@ import { safeNextPath } from "@/lib/safe-redirect";
 // (shouldCreateUser defaults true) — access beyond login is gated entirely
 // by platform_admins/business_members via RLS, not by who is allowed to
 // authenticate. Shared by /login and /signup, differing only in `next`.
-
-export type RequestCodeState = { error: string | null; sent: boolean; email: string };
-export type VerifyCodeState = { error: string | null };
-
-export const initialRequestCodeState: RequestCodeState = { error: null, sent: false, email: "" };
-export const initialVerifyCodeState: VerifyCodeState = { error: null };
 
 export async function requestLoginCode(
   _prevState: RequestCodeState,

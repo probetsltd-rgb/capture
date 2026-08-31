@@ -1,12 +1,8 @@
 "use client";
 
 import { useActionState } from "react";
-import {
-  requestLoginCode,
-  verifyLoginCode,
-  initialRequestCodeState,
-  initialVerifyCodeState,
-} from "@/app/login/actions";
+import { requestLoginCode, verifyLoginCode } from "@/app/login/actions";
+import { initialRequestCodeState, initialVerifyCodeState } from "@/app/login/state";
 
 // Shared by /login and /signup — a typed 6-digit code, not a clickable
 // magic link (see actions.ts for why). Two separate useActionState hooks
