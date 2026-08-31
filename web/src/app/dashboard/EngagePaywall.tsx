@@ -39,7 +39,7 @@ export function EngagePaywall({ businessId, reason, plans }: { businessId: strin
               {formatNaira(plan.priceKobo)}/mo
             </p>
             <ul className="meta" style={{ paddingLeft: "1.2rem" }}>
-              <li>{plan.messageLimit ? `${plan.messageLimit.toLocaleString()} AI-handled messages/mo` : "Unlimited messages"}</li>
+              <li>{plan.messageLimit ? `${plan.messageLimit.toLocaleString()} customer messages handled/mo` : "Unlimited messages"}</li>
               <li>
                 {plan.escalationNotificationLimit === 1
                   ? "Escalations go to 1 team member"

@@ -262,7 +262,7 @@ export default async function Home() {
                     <ul className="meta" style={{ paddingLeft: "1.1rem", marginTop: "var(--s4)" }}>
                       <li>
                         {plan.message_limit
-                          ? `${plan.message_limit.toLocaleString()} AI-handled messages/mo`
+                          ? `${plan.message_limit.toLocaleString()} customer messages handled/mo`
                           : "Unlimited messages"}
                       </li>
                       <li>
