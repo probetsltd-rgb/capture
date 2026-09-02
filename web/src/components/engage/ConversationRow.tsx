@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { markTakeConversation, closeConversation } from "./actions";
+import { markTakeConversation, closeConversation, sendConversationReply } from "./actions";
 
 type MessageForThread = { sender_type: string; body: string | null; sent_at: string };
 
@@ -62,6 +62,50 @@ function MessageThread({ messages }: { messages: MessageForThread[] }) {
   );
 }
 
+// The actual "talk to the customer" action — added alongside Take
+// Conversation, which previously only stopped the AI without giving a
+// human any way to reply from inside Capture at all. Only shown once a
+// conversation is taken (human_handling), same reasoning as requiring
+// Take first everywhere else in this component: makes ownership explicit
+// so two team members can't reply to the same customer at once.
+function ReplyForm({ businessId, conversationId }: { businessId: string; conversationId: string }) {
+  const [pending, startTransition] = useTransition();
+  const [text, setText] = useState("");
+  const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
+
+  return (
+    <div className="field" style={{ marginTop: "var(--s2)" }}>
+      <textarea
+        className="input"
+        placeholder="Reply to the customer…"
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        disabled={pending}
+        rows={2}
+        style={{ maxWidth: 420 }}
+      />
+      <button
+        type="button"
+        className="btn btn--primary"
+        disabled={pending || !text.trim()}
+        style={{ alignSelf: "flex-start" }}
+        onClick={() =>
+          startTransition(async () => {
+            const r = await sendConversationReply(businessId, conversationId, text);
+            setResult(r);
+            if (r.ok) setText("");
+          })
+        }
+      >
+        {pending ? "Sending…" : "Send reply"}
+      </button>
+      {result && (
+        <span className={result.ok ? "meta" : "notice notice--error"}>{result.message}</span>
+      )}
+    </div>
+  );
+}
+
 export function ConversationRow({
   businessId,
   conversationId,
@@ -78,7 +122,6 @@ export function ConversationRow({
   messages: MessageForThread[];
 }) {
   const [pending, startTransition] = useTransition();
-  const [assignee, setAssignee] = useState("");
   const [message, setMessage] = useState<string | null>(null);
 
   if (state === "human_handling") {
@@ -86,6 +129,7 @@ export function ConversationRow({
       <div style={{ display: "flex", flexDirection: "column", gap: "0.375rem" }}>
         <span className="meta">Taken by {assignedTo}</span>
         <MessageThread messages={messages} />
+        <ReplyForm businessId={businessId} conversationId={conversationId} />
       </div>
     );
   }
@@ -103,18 +147,12 @@ export function ConversationRow({
       {escalationReason && <span style={{ fontSize: "0.8rem", color: "#c66" }}>Escalated: {escalationReason}</span>}
       <MessageThread messages={messages} />
       <div style={{ display: "flex", gap: "0.25rem" }}>
-        <input
-          type="text"
-          placeholder="Your name"
-          value={assignee}
-          onChange={(e) => setAssignee(e.target.value)}
-          style={{ width: "90px" }}
-        />
         <button
+          className="btn btn--primary"
           disabled={pending}
           onClick={() =>
             startTransition(async () => {
-              const result = await markTakeConversation(businessId, conversationId, assignee);
+              const result = await markTakeConversation(businessId, conversationId);
               setMessage(result.message);
             })
           }
@@ -122,6 +160,7 @@ export function ConversationRow({
           Take conversation
         </button>
         <button
+          className="btn"
           disabled={pending}
           onClick={() =>
             startTransition(async () => {

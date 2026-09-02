@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { handleInboundMessage, takeConversation, type InboundResult } from "@/lib/prevent/process";
+import { sendHumanReply } from "@/lib/prevent/human-reply";
 
 export type SimulateResult = { ok: boolean; message: string };
 
@@ -135,10 +136,19 @@ export async function simulateInboundMessage(
   return { ok: true, message: "Suppressed — a human is already handling this conversation." };
 }
 
-export async function markTakeConversation(businessId: string, conversationId: string, assignedTo: string): Promise<SimulateResult> {
-  if (!assignedTo.trim()) return { ok: false, message: "Enter who is taking this conversation." };
+// Assignee is resolved from the signed-in session, not a free-typed name
+// (a real gap this used to have — anyone at the keyboard could type any
+// name, and it had no link back to an actual account). Uses email since
+// that's the one identity field already proven available from claims
+// elsewhere (admin/page.tsx, onboarding/page.tsx) — no separate "display
+// name" field exists on business_members or auth.users to prefer instead.
+export async function markTakeConversation(businessId: string, conversationId: string): Promise<SimulateResult> {
   const supabase = await createClient();
-  await takeConversation(supabase, conversationId, assignedTo.trim());
+  const { data: claims } = await supabase.auth.getClaims();
+  const email = claims?.claims?.email as string | undefined;
+  if (!email) return { ok: false, message: "Not signed in." };
+
+  await takeConversation(supabase, conversationId, email);
   revalidateEngagePaths(businessId);
   return { ok: true, message: "Conversation taken — AI will not respond further." };
 }
@@ -148,4 +158,22 @@ export async function closeConversation(businessId: string, conversationId: stri
   await supabase.from("conversations").update({ state: "closed" }).eq("id", conversationId);
   revalidateEngagePaths(businessId);
   return { ok: true, message: "Closed." };
+}
+
+// Sends a human team member's typed reply to the customer. RLS-governed
+// pre-check (a non-member gets no row back) before falling through to
+// sendHumanReply's service-role work, same discipline as
+// disconnectInstagramAction/deleteInstagramDataAction in dashboard/actions.ts.
+export async function sendConversationReply(
+  businessId: string,
+  conversationId: string,
+  text: string,
+): Promise<SimulateResult> {
+  const supabase = await createClient();
+  const { data: business } = await supabase.from("businesses").select("id").eq("id", businessId).maybeSingle();
+  if (!business) return { ok: false, message: "No business visible with this ID." };
+
+  const result = await sendHumanReply(businessId, conversationId, text);
+  revalidateEngagePaths(businessId);
+  return result;
 }

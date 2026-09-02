@@ -220,6 +220,52 @@ export async function resetInstagramConversationHistoryAction(businessId: string
   };
 }
 
+// Groundwork for WhatsApp-relay escalations (not live yet — WhatsApp
+// sending/receiving is still blocked on DEP-1, see OUTSTANDINGS.md) — a
+// team member's own notification number, self-serve since it's personal
+// contact info, not a business-wide setting. Uses the plain authenticated
+// client: business_members_update_self (20260902000000 migration) scopes
+// the RLS policy to `user_id = auth.uid()`, so the database itself
+// enforces that a member can only ever edit their own row — no explicit
+// ownership check needed here, unlike the channel_connections-backed
+// actions above which have zero RLS and must check in code.
+const E164_PATTERN = /^\+[1-9]\d{7,14}$/;
+
+export async function updateOwnWhatsAppNumber(
+  businessId: string,
+  _prevState: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { data: claims } = await supabase.auth.getClaims();
+  if (!claims?.claims) return { ok: false, message: "Not signed in." };
+  const userId = claims.claims.sub as string;
+
+  const trimmed = String(formData.get("rawNumber") ?? "").trim();
+  const whatsappNumber = trimmed === "" ? null : trimmed;
+  if (whatsappNumber && !E164_PATTERN.test(whatsappNumber)) {
+    return {
+      ok: false,
+      message: "Enter your number in international format, e.g. +2348012345678 (no spaces or dashes).",
+    };
+  }
+
+  const { data, error } = await supabase
+    .from("business_members")
+    .update({ whatsapp_number: whatsappNumber })
+    .eq("business_id", businessId)
+    .eq("user_id", userId)
+    .select("id");
+
+  if (error) return { ok: false, message: "Could not save. Please try again." };
+  if (!data || data.length === 0) {
+    return { ok: false, message: "Could not save — check you have access to this business." };
+  }
+
+  revalidatePath("/dashboard/settings");
+  return { ok: true, message: whatsappNumber ? "Notification number saved." : "Notification number removed." };
+}
+
 // Founder request 2026-08-21: pay-to-continue billing for Engage. Starts a
 // real Paystack checkout for the chosen plan and redirects there — this
 // throws Next's internal redirect signal on success, so a normal return
