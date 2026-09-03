@@ -101,7 +101,7 @@ export default async function DashboardPage({
       .select("id", { count: "exact", head: true })
       .eq("business_id", businessId)
       .is("approved_at", null),
-    supabase.from("plans").select("id, display_name, price_kobo, message_limit, escalation_notification_limit, has_analytics"),
+    supabase.from("plans").select("id, display_name, tier, billing_interval, price_kobo, message_limit, escalation_notification_limit, has_analytics"),
     getInstagramConnectionStatus(businessId),
   ]);
 
@@ -314,6 +314,8 @@ export default async function DashboardPage({
               plans={(plans ?? []).map((p) => ({
                 id: p.id,
                 displayName: p.display_name,
+                tier: p.tier,
+                billingInterval: p.billing_interval as "monthly" | "annual",
                 priceKobo: p.price_kobo,
                 messageLimit: p.message_limit,
                 escalationNotificationLimit: p.escalation_notification_limit,

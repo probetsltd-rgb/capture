@@ -33,11 +33,31 @@ import { HOME_FAQS } from "./faq-data";
 type EngagePlanRow = {
   id: string;
   display_name: string;
+  tier: string;
+  billing_interval: "monthly" | "annual";
   price_kobo: number;
   message_limit: number | null;
   escalation_notification_limit: number;
   has_analytics: boolean;
 };
+
+type EngageTierGroup = { tier: string; displayName: string; monthly?: EngagePlanRow; annual?: EngagePlanRow };
+
+// Static (no toggle) deliberately — this page's job is to communicate
+// pricing and funnel to the free trial, not to transact; actual plan
+// selection happens later at EngagePaywall. Both durations shown
+// together keeps this a plain Server Component, no client-side state
+// needed just to switch a displayed number.
+function groupEngagePlansByTier(plans: EngagePlanRow[]): EngageTierGroup[] {
+  const byTier = new Map<string, EngageTierGroup>();
+  for (const plan of plans) {
+    const entry = byTier.get(plan.tier) ?? { tier: plan.tier, displayName: plan.display_name };
+    if (plan.billing_interval === "annual") entry.annual = plan;
+    else entry.monthly = plan;
+    byTier.set(plan.tier, entry);
+  }
+  return Array.from(byTier.values());
+}
 
 function formatNaira(kobo: number): string {
   return `₦${(kobo / 100).toLocaleString("en-NG")}`;
@@ -58,9 +78,10 @@ export default async function Home() {
   const supabase = createServiceRoleClient();
   const { data: plans } = await supabase
     .from("plans")
-    .select("id, display_name, price_kobo, message_limit, escalation_notification_limit, has_analytics")
+    .select("id, display_name, tier, billing_interval, price_kobo, message_limit, escalation_notification_limit, has_analytics")
     .order("price_kobo", { ascending: true });
   const engagePlans = (plans ?? []) as EngagePlanRow[];
+  const engageTiers = groupEngagePlansByTier(engagePlans);
 
   // Mirrors only what's actually visible on this page (name, hero
   // description, the 7-day free trial, and now the real live tier prices
@@ -80,10 +101,13 @@ export default async function Home() {
       { "@type": "Offer", description: "7-day free trial", priceCurrency: "NGN", price: "0" },
       ...engagePlans.map((plan) => ({
         "@type": "Offer",
-        name: plan.display_name,
+        name: `${plan.display_name} (${plan.billing_interval})`,
         priceCurrency: "NGN",
         price: String(plan.price_kobo / 100),
-        priceSpecification: { "@type": "UnitPriceSpecification", billingDuration: "P1M" },
+        priceSpecification: {
+          "@type": "UnitPriceSpecification",
+          billingDuration: plan.billing_interval === "annual" ? "P1Y" : "P1M",
+        },
       })),
     ],
   };
@@ -249,46 +273,60 @@ export default async function Home() {
                   marginTop: "var(--s6)",
                 }}
               >
-                {engagePlans.map((plan) => (
-                  <div
-                    key={plan.id}
-                    style={{
-                      padding: "var(--s5)",
-                      border: "1px solid var(--rule)",
-                      borderRadius: "var(--radius)",
-                      background: "var(--paper)",
-                    }}
-                  >
-                    <h3 className="h3">{plan.display_name}</h3>
-                    <p className="mono" style={{ fontSize: "1.5rem", marginTop: "var(--s2)" }}>
-                      {formatNaira(plan.price_kobo)}
-                      <span className="meta" style={{ fontWeight: 400 }}>
-                        /mo
-                      </span>
-                    </p>
-                    <ul className="meta" style={{ paddingLeft: "1.1rem", marginTop: "var(--s4)" }}>
-                      <li>
-                        {plan.message_limit
-                          ? `${plan.message_limit.toLocaleString()} customer messages handled/mo`
-                          : "Unlimited messages"}
-                      </li>
-                      <li>
-                        {plan.escalation_notification_limit === 1
-                          ? "Escalations go to 1 team member"
-                          : `Escalations reach up to ${plan.escalation_notification_limit} team members`}
-                      </li>
-                      <li>Knowledge-base assist (30-day history review)</li>
-                      {plan.has_analytics && <li>Weekly/monthly conversation analytics</li>}
-                    </ul>
-                    <Link
-                      href="/signup?intent=engage"
-                      className="btn btn--primary btn--block"
-                      style={{ marginTop: "var(--s5)" }}
+                {engageTiers.map((t) => {
+                  const plan = t.monthly ?? t.annual;
+                  if (!plan) return null;
+                  const savings = t.monthly && t.annual ? t.monthly.price_kobo * 12 - t.annual.price_kobo : 0;
+
+                  return (
+                    <div
+                      key={t.tier}
+                      style={{
+                        padding: "var(--s5)",
+                        border: "1px solid var(--rule)",
+                        borderRadius: "var(--radius)",
+                        background: "var(--paper)",
+                      }}
                     >
-                      Try Free — no card needed
-                    </Link>
-                  </div>
-                ))}
+                      <h3 className="h3">{t.displayName}</h3>
+                      {t.monthly && (
+                        <p className="mono" style={{ fontSize: "1.5rem", marginTop: "var(--s2)" }}>
+                          {formatNaira(t.monthly.price_kobo)}
+                          <span className="meta" style={{ fontWeight: 400 }}>
+                            /mo
+                          </span>
+                        </p>
+                      )}
+                      {t.annual && (
+                        <p className="meta" style={{ marginTop: "var(--s1)" }}>
+                          or {formatNaira(t.annual.price_kobo)}/yr
+                          {savings > 0 && ` — save ${formatNaira(savings)} (about 2 months free)`}
+                        </p>
+                      )}
+                      <ul className="meta" style={{ paddingLeft: "1.1rem", marginTop: "var(--s4)" }}>
+                        <li>
+                          {plan.message_limit
+                            ? `${plan.message_limit.toLocaleString()} customer messages handled/mo`
+                            : "Unlimited messages"}
+                        </li>
+                        <li>
+                          {plan.escalation_notification_limit === 1
+                            ? "Escalations go to 1 team member"
+                            : `Escalations reach up to ${plan.escalation_notification_limit} team members`}
+                        </li>
+                        <li>Knowledge-base assist (30-day history review)</li>
+                        {plan.has_analytics && <li>Weekly/monthly conversation analytics</li>}
+                      </ul>
+                      <Link
+                        href="/signup?intent=engage"
+                        className="btn btn--primary btn--block"
+                        style={{ marginTop: "var(--s5)" }}
+                      >
+                        Try Free — no card needed
+                      </Link>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </section>

@@ -15,8 +15,9 @@ export default async function AdminPlansPage() {
   const [{ data: plans }, { data: trialSetting }] = await Promise.all([
     supabase
       .from("plans")
-      .select("id, display_name, price_kobo, message_limit, escalation_notification_limit, has_analytics, paystack_plan_code")
-      .order("price_kobo", { ascending: true }),
+      .select("id, display_name, tier, billing_interval, price_kobo, message_limit, escalation_notification_limit, has_analytics, paystack_plan_code")
+      .order("tier", { ascending: true })
+      .order("billing_interval", { ascending: true }),
     supabase.from("app_settings").select("value").eq("key", "trial_days").maybeSingle(),
   ]);
 
@@ -41,6 +42,7 @@ export default async function AdminPlansPage() {
               plan={{
                 id: plan.id,
                 displayName: plan.display_name,
+                billingInterval: plan.billing_interval as "monthly" | "annual",
                 priceKobo: plan.price_kobo,
                 messageLimit: plan.message_limit,
                 escalationNotificationLimit: plan.escalation_notification_limit,

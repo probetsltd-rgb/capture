@@ -6,6 +6,7 @@ import { updatePlan } from "./actions";
 export type PlanRow = {
   id: string;
   displayName: string;
+  billingInterval: "monthly" | "annual";
   priceKobo: number;
   messageLimit: number | null;
   escalationNotificationLimit: number;
@@ -24,9 +25,11 @@ export function PlanEditForm({ plan }: { plan: PlanRow }) {
 
   return (
     <div className="stack" style={{ border: "1px solid var(--rule)", borderRadius: "var(--radius)", padding: "var(--s4)" }}>
-      <h3 style={{ margin: 0 }}>{plan.displayName}</h3>
+      <h3 style={{ margin: 0 }}>
+        {plan.displayName} <span className="meta">({plan.billingInterval === "annual" ? "Annual" : "Monthly"})</span>
+      </h3>
       <label>
-        Price (₦/month)
+        Price (₦/{plan.billingInterval === "annual" ? "year" : "month"})
         <input type="number" min="0" value={priceNaira} onChange={(e) => setPriceNaira(e.target.value)} />
       </label>
       <label>
