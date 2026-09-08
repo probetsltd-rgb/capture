@@ -128,6 +128,8 @@ export default async function AdminPage() {
         <Link href="/admin/plans">Manage Engage plans/pricing →</Link>
         {" · "}
         <Link href="/admin/recover-plans">Manage Recover plans/pricing →</Link>
+        {" · "}
+        <Link href="/admin/whatsapp-templates">WhatsApp message templates →</Link>
       </p>
 
       <section style={{ margin: "2rem 0" }}>

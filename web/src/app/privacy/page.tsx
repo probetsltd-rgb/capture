@@ -24,7 +24,7 @@ export default function PrivacyPage() {
       <main>
         <div className="shell band prose">
           <h1 className="h2">Capture — Terms &amp; Privacy</h1>
-          <p className="meta">Last updated 2026-08-19.</p>
+          <p className="meta">Last updated 2026-09-07.</p>
 
           <h2>What Capture is</h2>
           <p>
@@ -68,9 +68,11 @@ export default function PrivacyPage() {
             knowledge base — never general knowledge, never a guess. Anything it isn&apos;t confident is
             fully covered by your approved knowledge, or that needs judgement (price negotiation, a
             complaint, an unusual request), is routed to your team instead of answered automatically. You
-            can take over any conversation at any time, which immediately and permanently stops automated
-            replies on that conversation. Engage does not autonomously negotiate, issue refunds, process
-            payments, or make bookings.
+            can take over any conversation at any time, which immediately stops automated replies on that
+            conversation. If your team goes quiet on a customer&apos;s message for more than 10 minutes,
+            Engage resumes rather than leaving it unanswered — always visibly noted in the conversation, and
+            your team can take it back over at any point. Engage does not autonomously negotiate, issue
+            refunds, process payments, or make bookings.
           </p>
 
           <h2>Data we collect, and why</h2>

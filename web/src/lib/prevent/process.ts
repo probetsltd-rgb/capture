@@ -4,6 +4,9 @@ import { processInboundMessage } from "./engine";
 import { evaluateSafeResponseGate } from "./safe-response-gate";
 import { sendEscalationNotification } from "@/lib/notifications/escalation-email";
 import { getSiteUrl } from "@/lib/site-url";
+import { RESUME_AFTER_SILENCE_MINUTES } from "./timers";
+import { decryptToken } from "@/lib/channels/token-crypto";
+import { sendMessage, sendMediaMessage, inferMediaType } from "@/lib/channels/instagram-api";
 
 // The kill switch (PRD §23: "when a human takes over, AI stops") is
 // enforced here, not just hidden behind a UI button — a conversation is
@@ -12,6 +15,17 @@ import { getSiteUrl } from "@/lib/site-url";
 // response if a human took over while the model was "thinking" (a real
 // generateObject call takes ~1-2s, a realistic window for this race).
 // Tested directly against that race in TESTS.md, not just reasoned about.
+//
+// Founder decision 2026-09-07: no longer literally permanent. A human
+// taking over still stops the AI immediately, but if the team goes quiet
+// on a customer's message for RESUME_AFTER_SILENCE_MINUTES (timers.ts),
+// resumeSilentConversation() below releases the claim (clears
+// human_taken_at/assigned_to, moves state off human_handling) and replays
+// the still-unanswered message through the exact same
+// processConversationMessage() a live webhook message goes through —
+// deliberately not a separate, parallel code path that could drift from
+// it. Terms & Privacy and the homepage FAQ were updated to match — "stops
+// automated replies" is no longer an unconditional "permanently".
 
 async function getConversationStatus(
   supabase: SupabaseClient,
@@ -167,6 +181,23 @@ export async function handleInboundMessage(
   // regardless of how the message ends up handled.
   await supabase.from("conversations").update({ last_message_at: customerSentAt }).eq("id", conversationId);
 
+  return processConversationMessage(supabase, businessId, conversationId, messageBody);
+}
+
+// Extracted 2026-09-07 from handleInboundMessage so resumeSilentConversation
+// (below) replays an already-stored, still-unanswered message through the
+// exact same respond/escalate logic a live webhook message goes through,
+// rather than a second, parallel implementation that could drift from it.
+// Callers are responsible for the message already existing in `messages`
+// and for `conversations.last_message_at` already being current —
+// handleInboundMessage does both before calling this; resumeSilentConversation
+// does neither, since the message it's replaying is already stored.
+async function processConversationMessage(
+  supabase: SupabaseClient,
+  businessId: string,
+  conversationId: string,
+  messageBody: string,
+): Promise<InboundResult> {
   const initialStatus = await getConversationStatus(supabase, conversationId);
   if (isHumanActive(initialStatus)) {
     return { status: "suppressed_human_active" };
@@ -369,4 +400,104 @@ export async function takeConversation(
     .from("conversations")
     .update({ state: "human_handling", human_taken_at: new Date().toISOString(), assigned_to: assignedTo })
     .eq("id", conversationId);
+}
+
+// Founder decision 2026-09-07 — see this file's top-of-file note. Called by
+// the resume-after-silence cron (api/cron/resume-after-silence) for a
+// conversation it already confirmed is `human_handling` with its latest
+// message from the customer, unanswered for
+// RESUME_AFTER_SILENCE_MINUTES+ (lib/prevent/timers.ts). Releases the human
+// claim and flips state off `human_handling` BEFORE calling
+// processConversationMessage, so that function's own isHumanActive() check
+// (identical to a live message's) naturally proceeds rather than needing a
+// bypass flag — resuming is "un-claim it, then let it go through the exact
+// same pipeline as any other message." A visible `system` message marks
+// the moment for the team, so it's never a silent handoff back to the AI.
+export async function resumeSilentConversation(
+  supabase: SupabaseClient,
+  businessId: string,
+  conversationId: string,
+): Promise<InboundResult> {
+  const { data: latestMessage } = await supabase
+    .from("messages")
+    .select("body")
+    .eq("conversation_id", conversationId)
+    .order("sent_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  // Cron's own query already filters to conversations whose latest message
+  // is from the customer — a missing/bodyless message here would mean that
+  // filter and this read raced against a new message arriving in between.
+  // Nothing to resume with in that case; the next cron pass re-evaluates.
+  if (!latestMessage?.body) return { status: "suppressed_human_active" };
+
+  await supabase
+    .from("conversations")
+    .update({ human_taken_at: null, assigned_to: null, state: "ai_handling" })
+    .eq("id", conversationId);
+  await supabase.from("messages").insert({
+    business_id: businessId,
+    conversation_id: conversationId,
+    sender_type: "system",
+    body: `Engage resumed after ${RESUME_AFTER_SILENCE_MINUTES} minutes with no reply from your team.`,
+    sent_at: new Date().toISOString(),
+  });
+
+  const result = await processConversationMessage(supabase, businessId, conversationId, latestMessage.body);
+
+  // processConversationMessage only decides and stores what the AI would
+  // say — dispatching it to the actual customer is normally the inbound
+  // webhook's job (api/channels/instagram/webhook/route.ts, right after its
+  // own handleInboundMessage call) because a fresh webhook request always
+  // has one to send from. This code path has no such caller, so a resumed
+  // "responded" result has to send itself, or the customer would see the
+  // reply sitting in the dashboard forever and never actually receive it.
+  if (result.status === "responded") {
+    await dispatchResponse(supabase, businessId, conversationId, result.response, result.mediaUrl);
+  }
+
+  return result;
+}
+
+async function dispatchResponse(
+  supabase: SupabaseClient,
+  businessId: string,
+  conversationId: string,
+  response: string,
+  mediaUrl: string | null,
+): Promise<void> {
+  const { data: conversation } = await supabase
+    .from("conversations")
+    .select("channel, customer_id")
+    .eq("id", conversationId)
+    .maybeSingle();
+  if (conversation?.channel !== "instagram") return; // WhatsApp isn't live yet — same gap sendHumanReply has.
+
+  const { data: customer } = await supabase
+    .from("customers")
+    .select("external_customer_id")
+    .eq("id", conversation.customer_id)
+    .maybeSingle();
+  if (!customer?.external_customer_id) return;
+
+  const { data: connection } = await supabase
+    .from("channel_connections")
+    .select("access_token_encrypted, external_account_id")
+    .eq("business_id", businessId)
+    .eq("channel", "instagram")
+    .is("disconnected_at", null)
+    .maybeSingle();
+  if (!connection) return;
+
+  const accessToken = decryptToken(connection.access_token_encrypted);
+  await sendMessage(accessToken, connection.external_account_id, customer.external_customer_id, response);
+  if (mediaUrl) {
+    await sendMediaMessage(
+      accessToken,
+      connection.external_account_id,
+      customer.external_customer_id,
+      mediaUrl,
+      inferMediaType(mediaUrl),
+    );
+  }
 }

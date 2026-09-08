@@ -52,3 +52,38 @@ export function computeDueTimerActions(
   }
   return actions;
 }
+
+// Founder decision 2026-09-07: after a team takes a conversation
+// (human_handling), if the customer's most recent message has gone this
+// many minutes without a team reply, Engage resumes rather than leaving it
+// stuck on a team member who's gone quiet. Matches the existing T+10
+// reminder threshold above rather than inventing a separate number — see
+// lib/prevent/process.ts's resumeSilentConversation for the actual resume,
+// and api/cron/resume-after-silence for what calls this.
+export const RESUME_AFTER_SILENCE_MINUTES = 10;
+
+export type ConversationForResume = {
+  id: string;
+  latestMessageSenderType: string | null;
+  latestMessageSentAt: string | null;
+};
+
+/**
+ * Given human_handling conversations paired with their latest message,
+ * return the ids whose latest message is from the customer and has sat
+ * unanswered for RESUME_AFTER_SILENCE_MINUTES+. Pure so the threshold is
+ * testable without a live cron trigger, same reasoning as
+ * computeDueTimerActions above.
+ */
+export function computeConversationsToResume(
+  conversations: ConversationForResume[],
+  now: Date = new Date(),
+): string[] {
+  const ids: string[] = [];
+  for (const conv of conversations) {
+    if (conv.latestMessageSenderType !== "customer" || !conv.latestMessageSentAt) continue;
+    const minutesSinceLastMessage = (now.getTime() - new Date(conv.latestMessageSentAt).getTime()) / 60000;
+    if (minutesSinceLastMessage >= RESUME_AFTER_SILENCE_MINUTES) ids.push(conv.id);
+  }
+  return ids;
+}

@@ -6,8 +6,16 @@
       "schedule": "*/10 * * * *"
     },
     {
+      "path": "/api/cron/resume-after-silence",
+      "schedule": "*/10 * * * *"
+    },
+    {
       "path": "/api/cron/conversation-analytics",
       "schedule": "0 6 * * 1"
+    },
+    {
+      "path": "/api/cron/refresh-channel-tokens",
+      "schedule": "0 5 * * *"
     }
   ]
 }

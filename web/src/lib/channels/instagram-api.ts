@@ -132,6 +132,26 @@ export async function exchangeForLongLivedToken(
   return JSON.parse(bodyText);
 }
 
+// Founder decision 2026-09-08: closes a real, previously-unaddressed gap
+// found while building WhatsApp's own token refresh — this long-lived
+// token has always had a 60-day expiry (token_expires_at is stored at
+// connect time) but nothing has ever refreshed it. Must be at least 24h
+// old and not yet expired (Meta's own documented constraint) — see
+// api/cron/refresh-channel-tokens, which calls this well before either
+// boundary.
+export async function refreshLongLivedToken(currentToken: string): Promise<LongLivedTokenResponse> {
+  const url = new URL("https://graph.instagram.com/refresh_access_token");
+  url.searchParams.set("grant_type", "ig_refresh_token");
+  url.searchParams.set("access_token", currentToken);
+
+  const response = await fetch(url.toString());
+  const bodyText = await response.text();
+  if (!response.ok) {
+    throw new Error(`Instagram token refresh failed: ${response.status} ${bodyText}`);
+  }
+  return JSON.parse(bodyText);
+}
+
 type ProfileResponse = {
   user_id: string;
   username: string;

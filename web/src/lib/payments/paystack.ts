@@ -130,6 +130,60 @@ export async function updatePaystackPlanAmount(
   }
 }
 
+// Founder request 2026-09-07: self-serve cancellation — there was no way
+// for a business to cancel except emailing us. Disabling a subscription
+// requires both the subscription code and its email_token (confirmed
+// against Paystack's current docs: POST /subscription/disable, body
+// {code, token}) — the token isn't something we store ourselves, so it's
+// fetched fresh from GET /subscription/:code right before disabling
+// rather than captured once from a subscription.create webhook we don't
+// currently handle.
+export type FetchedSubscription = {
+  subscriptionCode: string;
+  emailToken: string;
+  status: string;
+};
+
+export async function fetchSubscription(subscriptionCode: string): Promise<FetchedSubscription> {
+  const response = await fetch(`${PAYSTACK_BASE_URL}/subscription/${encodeURIComponent(subscriptionCode)}`, {
+    headers: { Authorization: `Bearer ${secretKey()}` },
+  });
+
+  const body = await response.json();
+  if (!response.ok || !body.status) {
+    throw new Error(`Paystack fetch-subscription failed: ${body.message ?? response.statusText}`);
+  }
+
+  return {
+    subscriptionCode: body.data.subscription_code,
+    emailToken: body.data.email_token,
+    status: body.data.status,
+  };
+}
+
+// Cancels immediately (stops the next recurring charge) — our own access
+// gate (checkBillingGate in lib/prevent/process.ts) treats any non-"active"
+// plan_status the same as a lapsed trial, so once the
+// subscription.disable webhook lands, Engage access stops right away too.
+// There's no partial-period grace window anywhere else in this codebase
+// (message limits, trial gating) to be consistent with, so this doesn't
+// invent one.
+export async function disableSubscription(subscriptionCode: string, emailToken: string): Promise<void> {
+  const response = await fetch(`${PAYSTACK_BASE_URL}/subscription/disable`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${secretKey()}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ code: subscriptionCode, token: emailToken }),
+  });
+
+  const body = await response.json();
+  if (!response.ok || !body.status) {
+    throw new Error(`Paystack disable-subscription failed: ${body.message ?? response.statusText}`);
+  }
+}
+
 // x-paystack-signature is an HMAC-SHA512 hex digest of the raw request
 // body, keyed with the secret key — confirmed against Paystack's current
 // webhook documentation. Constant-time comparison, same pattern as the

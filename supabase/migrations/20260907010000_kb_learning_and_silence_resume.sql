@@ -1,0 +1,18 @@
+-- Founder request 2026-09-07: two Engage behaviors confirmed in chat before
+-- building (per standing scope-before-building practice).
+--
+-- 1. Team replies teach the knowledge base: reuses the existing
+--    extractKnowledgeItems() pipeline (already proven on the 30-day
+--    historical import, lib/channels/instagram.ts) against a single
+--    conversation's team replies once it's closed. team_knowledge_extracted_at
+--    is a one-time-per-conversation gate, same shape as
+--    businesses.knowledge_base_seeded_at, so re-closing an already-processed
+--    conversation never re-runs (and re-bills) the extraction.
+--
+-- 2. AI resumes after team silence: no new column needed — resuming clears
+--    the existing human_taken_at/assigned_to and flips state away from
+--    'human_handling', which is exactly what a normal AI-handled
+--    conversation looks like. See lib/prevent/process.ts
+--    (resumeSilentConversation) and lib/prevent/timers.ts
+--    (computeConversationsToResume, RESUME_AFTER_SILENCE_MINUTES).
+alter table conversations add column team_knowledge_extracted_at timestamptz;

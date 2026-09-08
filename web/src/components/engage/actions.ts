@@ -5,6 +5,8 @@ import { createClient } from "@/lib/supabase/server";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { handleInboundMessage, takeConversation, type InboundResult } from "@/lib/prevent/process";
 import { sendHumanReply } from "@/lib/prevent/human-reply";
+import { extractKnowledgeItems } from "@/lib/ingest/brochure-extract";
+import { redactPii } from "@/lib/classification/redact";
 
 export type SimulateResult = { ok: boolean; message: string };
 
@@ -156,8 +158,101 @@ export async function markTakeConversation(businessId: string, conversationId: s
 export async function closeConversation(businessId: string, conversationId: string): Promise<SimulateResult> {
   const supabase = await createClient();
   await supabase.from("conversations").update({ state: "closed" }).eq("id", conversationId);
+  await extractKnowledgeFromTeamReplies(supabase, businessId, conversationId);
   revalidateEngagePaths(businessId);
   return { ok: true, message: "Closed." };
+}
+
+// Founder decision 2026-09-07: reuses extractKnowledgeItems (already proven
+// on the 30-day historical import, lib/channels/instagram.ts's
+// seedKnowledgeFromHistory) against a single conversation's own team
+// replies once it's closed — a team member typing an answer live is the
+// same kind of "stated fact" signal as a past reply pulled from history,
+// just scoped to one conversation instead of a whole account. Proposals
+// land in the exact same pending-review queue (approved_at: null) as every
+// other source — this never lets a live reply teach the AI anything
+// without a human confirming it first, keeping the "never guesses" gate
+// intact.
+//
+// Gated on team_knowledge_extracted_at (mirrors businesses.
+// knowledge_base_seeded_at) so re-closing an already-processed conversation
+// is a no-op, not a repeat model call. Runs at close, not per-reply — cheap
+// relative to a live reply, and consolidates a whole conversation's replies
+// in one extraction pass the same way the historical seed consolidates
+// many conversations' worth.
+async function extractKnowledgeFromTeamReplies(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  businessId: string,
+  conversationId: string,
+): Promise<void> {
+  const { data: conversation } = await supabase
+    .from("conversations")
+    .select("team_knowledge_extracted_at")
+    .eq("id", conversationId)
+    .maybeSingle();
+  if (!conversation || conversation.team_knowledge_extracted_at) return;
+
+  const { data: messages } = await supabase
+    .from("messages")
+    .select("body")
+    .eq("conversation_id", conversationId)
+    .eq("sender_type", "business")
+    .not("body", "is", null);
+
+  // Mark extracted regardless of outcome (including "no team replies") —
+  // one-time-per-conversation, not retry-until-something-is-found, same
+  // reasoning as knowledge_base_seeded_at.
+  await supabase
+    .from("conversations")
+    .update({ team_knowledge_extracted_at: new Date().toISOString() })
+    .eq("id", conversationId);
+
+  const replies = (messages ?? [])
+    .map((m) => m.body as string)
+    .filter((body) => body.trim().length > 0)
+    .map((body) => redactPii(body));
+  if (replies.length === 0) return;
+
+  const items = await extractKnowledgeItems(replies.join("\n\n"), "conversation_history");
+  if (!items || items.length === 0) return;
+
+  await supabase.from("knowledge_items").insert(
+    items.map((item) => ({
+      business_id: businessId,
+      category: item.category,
+      question: null,
+      content: item.content,
+      media_url: null,
+      approved_at: null, // pending review, same as brochure/historical items
+    })),
+  );
+}
+
+export type ConversationMessage = { sender_type: string; body: string | null; sent_at: string };
+
+// Founder-reported 2026-09-07: a team member watching an open thread
+// (ConversationRow's MessageThread) never saw a customer's new message
+// arrive — the row is rendered once from EngageDashboardView's server-side
+// fetch and nothing ever asked for fresher data afterward. Polling rather
+// than Supabase Realtime: nothing else in this codebase uses Realtime yet,
+// and at real current scale (TESTS.md: Rentit's 42 conversations/281
+// messages) a plain re-fetch every few seconds, only while a thread is
+// actually open, is simpler than standing up a new subscription mechanism
+// for one screen.
+export async function getConversationMessages(
+  businessId: string,
+  conversationId: string,
+): Promise<ConversationMessage[]> {
+  const supabase = await createClient();
+  const { data: business } = await supabase.from("businesses").select("id").eq("id", businessId).maybeSingle();
+  if (!business) return [];
+
+  const { data } = await supabase
+    .from("messages")
+    .select("sender_type, body, sent_at")
+    .eq("conversation_id", conversationId)
+    .order("sent_at", { ascending: true });
+  return data ?? [];
 }
 
 // Sends a human team member's typed reply to the customer. RLS-governed

@@ -1,22 +1,25 @@
 import "server-only";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { decryptToken } from "@/lib/channels/token-crypto";
-import { sendMessage } from "@/lib/channels/instagram-api";
+import { sendMessage as sendInstagramMessage } from "@/lib/channels/instagram-api";
+import { sendMessage as sendWhatsAppMessage } from "@/lib/channels/whatsapp-api";
 
 export type HumanReplyResult = { ok: boolean; message: string };
 
-const MAX_REPLY_LENGTH = 1000; // Instagram's own documented Send API limit
+// Instagram's own documented Send API limit (1000) — kept as the shared
+// cap for WhatsApp too even though its session-message limit is higher
+// (4096): a human-typed reply in this box realistically never approaches
+// either, so there's no reason to carry two different limits for one
+// textarea.
+const MAX_REPLY_LENGTH = 1000;
 
 // The first real "reply to the customer" path in the app — before this,
 // "Take Conversation" only stopped the AI; a human had to message the
 // customer outside Capture entirely. Deliberately dispatched by
-// `conversations.channel` rather than hardcoded to Instagram, even though
-// Instagram is the only live channel today: once WhatsApp ingestion is
-// live, a WhatsApp-sourced conversation's reply needs the same shape
-// (look up its channel_connections row, send, log a `business` message),
-// and this function shouldn't need restructuring to gain that branch —
-// see OUTSTANDINGS.md's WhatsApp-relay-escalation note for the fuller
-// design.
+// `conversations.channel` rather than hardcoded to Instagram — the
+// WhatsApp branch below (added 2026-09-08, DEV-35) is exactly the shape
+// predicted here originally: look up its channel_connections row, send,
+// log a `business` message, no restructuring needed.
 //
 // Caller must have already verified the current session owns businessId
 // (same discipline documented in lib/channels/instagram.ts) — this uses
@@ -63,7 +66,7 @@ export async function sendHumanReply(
     if (!connection) return { ok: false, message: "Instagram isn't connected for this business." };
 
     try {
-      await sendMessage(
+      await sendInstagramMessage(
         decryptToken(connection.access_token_encrypted),
         connection.external_account_id,
         customer.external_customer_id,
@@ -78,7 +81,33 @@ export async function sendHumanReply(
       };
     }
   } else if (conversation.channel === "whatsapp") {
-    return { ok: false, message: "WhatsApp replies aren't live yet." };
+    // Live as of 2026-09-08 (DEV-35) — this branch was the exact one
+    // predicted in this function's own top-of-file comment before
+    // WhatsApp ingestion existed.
+    const { data: connection } = await supabase
+      .from("channel_connections")
+      .select("access_token_encrypted, external_account_id")
+      .eq("business_id", businessId)
+      .eq("channel", "whatsapp")
+      .is("disconnected_at", null)
+      .maybeSingle();
+    if (!connection) return { ok: false, message: "WhatsApp isn't connected for this business." };
+
+    try {
+      await sendWhatsAppMessage(
+        decryptToken(connection.access_token_encrypted),
+        connection.external_account_id,
+        customer.external_customer_id,
+        trimmed,
+      );
+    } catch (err) {
+      console.error("Human reply send failed", { businessId, conversationId, err });
+      return {
+        ok: false,
+        message:
+          "Couldn't send — WhatsApp rejected the message. This usually means the 24-hour reply window since the customer's last message has closed.",
+      };
+    }
   } else {
     return { ok: false, message: `Replying isn't supported for this conversation's channel yet.` };
   }

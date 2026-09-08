@@ -6,11 +6,18 @@ import { computeRecoverSummary } from "@/lib/recover/summary";
 import { computePreventSummary } from "@/lib/prevent/summary";
 import { computeNorthStar } from "@/lib/report/north-star";
 import { getInstagramConnectionStatus } from "@/lib/channels/instagram";
+import { getWhatsAppConnectionStatus } from "@/lib/channels/whatsapp";
+import { ConnectWhatsAppButton } from "./ConnectWhatsAppButton";
+import { ReconnectWhatsAppButton } from "./ReconnectWhatsAppButton";
+import { DisconnectWhatsAppButton } from "./DisconnectWhatsAppButton";
 import { generateRevenueLeakReport } from "@/lib/report/generate";
+import { computeResponseTimeStats, formatResponseDuration } from "@/lib/report/response-time";
 import { checkBillingGate } from "@/lib/prevent/process";
+import { describePlanStatus } from "@/lib/billing/describe";
 import { ActivateButton } from "./ActivateButton";
 import { DisconnectInstagramButton } from "./DisconnectInstagramButton";
 import { EngagePaywall } from "./EngagePaywall";
+import { CancelSubscriptionButton } from "./CancelSubscriptionButton";
 
 const LEAK_LABELS: Record<string, string> = {
   no_response: "Unanswered enquiries",
@@ -41,6 +48,11 @@ export default async function DashboardPage({
   searchParams: Promise<{ instagram?: string; reason?: string }>;
 }) {
   const { instagram: instagramStatus, reason: instagramReason } = await searchParams;
+  // Not secret (an App ID/Configuration ID are meant to be visible to a
+  // client-side Facebook Login flow) — read server-side and passed as
+  // props rather than duplicated under a NEXT_PUBLIC_ name.
+  const whatsappAppId = process.env.WHATSAPP_APP_ID ?? null;
+  const whatsappConfigId = process.env.WHATSAPP_CONFIG_ID ?? null;
 
   const supabase = await createClient();
   const { data: claims } = await supabase.auth.getClaims();
@@ -60,7 +72,7 @@ export default async function DashboardPage({
   const { data: business } = await supabase
     .from("businesses")
     .select(
-      "id, name, industry, upload_token, onboarded_at, prevent_activated_at, plan_status, trial_started_at, trial_ends_at, current_period_end",
+      "id, name, industry, upload_token, onboarded_at, prevent_activated_at, plan_id, plan_status, trial_started_at, trial_ends_at, current_period_end",
     )
     .eq("id", businessId)
     .maybeSingle();
@@ -75,6 +87,7 @@ export default async function DashboardPage({
     { count: pendingKnowledgeCount },
     { data: plans },
     instagramConnection,
+    whatsappConnection,
   ] = await Promise.all([
     supabase.from("opportunities").select("status, actual_revenue").eq("business_id", businessId),
     supabase.from("conversations").select("id").eq("business_id", businessId).eq("source", "manual_export").limit(1),
@@ -103,6 +116,7 @@ export default async function DashboardPage({
       .is("approved_at", null),
     supabase.from("plans").select("id, display_name, tier, billing_interval, price_kobo, message_limit, escalation_notification_limit, has_analytics"),
     getInstagramConnectionStatus(businessId),
+    getWhatsAppConnectionStatus(businessId),
   ]);
 
   // Founder request 2026-08-21 (pay-to-continue billing) — same gate
@@ -152,6 +166,20 @@ export default async function DashboardPage({
       ? generateRevenueLeakReport(baselineConversations, scopedBaselineOpportunities)
       : null;
   const baselineLeaks = baseline ? Object.entries(baseline.leakageCounts).filter(([, count]) => count > 0) : [];
+
+  // Founder request 2026-09-08 (open want since 2026-08-15, PRD Addendum
+  // §18's own Day-5 example) — real average/fastest/slowest first-response
+  // time, same 30-day/Instagram-only scope as the baseline above. Fetched
+  // separately rather than folded into the conversations query above
+  // (which only selects classification columns) since this needs full
+  // message timestamps, batched once here rather than per-conversation.
+  const { data: baselineMessages } = baselineConversationIds.size
+    ? await supabase
+        .from("messages")
+        .select("conversation_id, sender_type, sent_at")
+        .in("conversation_id", Array.from(baselineConversationIds))
+    : { data: [] };
+  const responseTimeStats = computeResponseTimeStats(baselineMessages ?? []);
 
   const preventConvs = preventConversations ?? [];
   const preventConvIds = preventConvs.map((c) => c.id);
@@ -209,8 +237,11 @@ export default async function DashboardPage({
       )}
 
       {baseline && (
-        <section style={{ paddingTop: "var(--s6)" }}>
-          <h2>Your last 30 days on Instagram</h2>
+        <div className="panel" style={{ marginTop: "var(--s6)" }}>
+          <div className="panel__head">
+            <h2 className="h3" style={{ margin: 0 }}>Your last 30 days on Instagram</h2>
+          </div>
+          <div className="panel__body">
           <p className="meta">
             {baseline.classifiedConversations} of {baseline.totalConversations} conversation
             {baseline.totalConversations === 1 ? "" : "s"} analysed
@@ -240,6 +271,22 @@ export default async function DashboardPage({
                 <td>Revenue Readiness Score</td>
                 <td>{baseline.readinessScore.overall}/100</td>
               </tr>
+              {responseTimeStats && (
+                <>
+                  <tr>
+                    <td>Average response time</td>
+                    <td className="mono">{formatResponseDuration(responseTimeStats.averageSeconds)}</td>
+                  </tr>
+                  <tr>
+                    <td>Fastest response</td>
+                    <td className="mono realised">{formatResponseDuration(responseTimeStats.minSeconds)}</td>
+                  </tr>
+                  <tr>
+                    <td>Slowest response</td>
+                    <td className="mono dormant">{formatResponseDuration(responseTimeStats.maxSeconds)}</td>
+                  </tr>
+                </>
+              )}
               {baseline.hasAnyValueEstimate && (
                 <tr>
                   <td>Estimated opportunity value</td>
@@ -248,10 +295,11 @@ export default async function DashboardPage({
               )}
             </tbody>
           </table>
-          <p className="meta" style={{ marginTop: "var(--s3)" }}>
-            Average response time isn&apos;t measured yet — that&apos;s a known gap, not omitted by accident.
-            {baseline.hasAnyValueEstimate && " Estimated opportunity value is not a revenue guarantee."}
-          </p>
+          {baseline.hasAnyValueEstimate && (
+            <p className="meta" style={{ marginTop: "var(--s3)" }}>
+              Estimated opportunity value is not a revenue guarantee.
+            </p>
+          )}
           {(pendingKnowledgeCount ?? 0) > 0 && (
             <p className="notice notice--ok" style={{ marginTop: "var(--s3)" }}>
               We drafted {pendingKnowledgeCount} knowledge item{pendingKnowledgeCount === 1 ? "" : "s"} from what you
@@ -259,12 +307,16 @@ export default async function DashboardPage({
               <Link href="/dashboard/engage/knowledge">review and approve them →</Link>
             </p>
           )}
-        </section>
+          </div>
+        </div>
       )}
 
       <div className="app-grid">
-        <section>
-          <h2>Find</h2>
+        <div className="panel">
+          <div className="panel__head">
+            <h2 className="h3" style={{ margin: 0 }}>Find</h2>
+          </div>
+          <div className="panel__body">
           {hasFindData ? (
             <p>
               <Link href={`/report/${business.upload_token}`}>View your Revenue Leak Report →</Link>
@@ -275,15 +327,19 @@ export default async function DashboardPage({
               <Link href={`/upload/${business.upload_token}`}>Upload WhatsApp or Instagram conversations →</Link>
             </p>
           )}
-        </section>
+          </div>
+        </div>
 
-        <section>
+        <div className="panel">
           {/* 2026-08-25: real purchase-gated access now lives entirely at
               /dashboard/recover (see that page's gate) — no activation
               status is claimed here to avoid two places computing it and
               drifting apart, the exact gap that used to leave this page's
               free ActivateButton reachable regardless of real access. */}
-          <h2>Recover</h2>
+          <div className="panel__head">
+            <h2 className="h3" style={{ margin: 0 }}>Recover</h2>
+          </div>
+          <div className="panel__body">
           <table className="table">
             <tbody>
               <tr>
@@ -303,10 +359,16 @@ export default async function DashboardPage({
           <p>
             <Link href="/dashboard/recover">Manage campaign →</Link>
           </p>
-        </section>
+          </div>
+        </div>
 
-        <section>
-          <h2>Engage {business.prevent_activated_at ? "· Active" : "· Not activated"}</h2>
+        <div className="panel">
+          <div className="panel__head">
+            <h2 className="h3" style={{ margin: 0 }}>
+              Engage {business.prevent_activated_at ? "· Active" : "· Not activated"}
+            </h2>
+          </div>
+          <div className="panel__body">
           {business.prevent_activated_at && billingGateReason && (
             <EngagePaywall
               businessId={businessId}
@@ -322,6 +384,23 @@ export default async function DashboardPage({
                 hasAnalytics: p.has_analytics,
               }))}
             />
+          )}
+          {business.plan_status === "active" && !billingGateReason && (
+            <div style={{ margin: "0.5rem 0" }}>
+              <p className="meta">
+                Plan:{" "}
+                {describePlanStatus(
+                  {
+                    planStatus: business.plan_status,
+                    trialStartedAt: business.trial_started_at,
+                    trialEndsAt: business.trial_ends_at,
+                    currentPeriodEnd: business.current_period_end,
+                  },
+                  (plans ?? []).find((p) => p.id === business.plan_id)?.display_name ?? null,
+                )}
+              </p>
+              <CancelSubscriptionButton businessId={businessId} />
+            </div>
           )}
           {/* Moved out of the stats table and given real visual weight
               2026-08-31 — a founder testing Connect end-to-end for the
@@ -391,6 +470,26 @@ export default async function DashboardPage({
                   )}
                 </td>
               </tr>
+              <tr>
+                <td>WhatsApp</td>
+                <td>
+                  {whatsappConnection.connected ? (
+                    <span style={{ display: "inline-flex", gap: "var(--s3)", alignItems: "center" }}>
+                      Connected{whatsappConnection.phoneNumber ? ` — ${whatsappConnection.phoneNumber}` : ""}
+                      <DisconnectWhatsAppButton businessId={businessId} />
+                    </span>
+                  ) : whatsappConnection.canReconnect ? (
+                    <span style={{ display: "inline-flex", gap: "var(--s3)", alignItems: "center" }}>
+                      Not connected{whatsappConnection.phoneNumber ? ` — was ${whatsappConnection.phoneNumber}` : ""}
+                      <ReconnectWhatsAppButton businessId={businessId} />
+                    </span>
+                  ) : whatsappAppId && whatsappConfigId ? (
+                    <ConnectWhatsAppButton appId={whatsappAppId} configId={whatsappConfigId} />
+                  ) : (
+                    "Not available yet"
+                  )}
+                </td>
+              </tr>
             </tbody>
           </table>
           <p>
@@ -398,11 +497,15 @@ export default async function DashboardPage({
             <Link href="/dashboard/engage/knowledge">Manage approved knowledge →</Link>
           </p>
           {!business.prevent_activated_at && <ActivateButton businessId={businessId} product="prevent" />}
-        </section>
+          </div>
+        </div>
       </div>
 
-      <section style={{ paddingTop: "var(--s6)", borderTop: "1px solid var(--rule)" }}>
-        <h2>Incremental Revenue Influenced by Capture</h2>
+      <div className="panel" style={{ marginTop: "var(--s7)" }}>
+        <div className="panel__head">
+          <h2 className="h3" style={{ margin: 0 }}>Incremental Revenue Influenced by Capture</h2>
+        </div>
+        <div className="panel__body">
         <p className="meta">
           Messages handled → opportunities identified → opportunities recovered → revenue recovered → revenue
           protected/generated. Only the Recover leg is measurable today.
@@ -433,7 +536,8 @@ export default async function DashboardPage({
             </tr>
           </tbody>
         </table>
-      </section>
+        </div>
+      </div>
     </main>
   );
 }

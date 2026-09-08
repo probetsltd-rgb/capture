@@ -6,7 +6,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getOwnBusinessId } from "@/lib/business-membership";
 import { MAX_AUTOMATIONS_PER_OPPORTUNITY } from "@/lib/recover/rules";
 import { disconnectInstagram, deleteInstagramData, resetInstagramConversationHistory } from "@/lib/channels/instagram";
-import { initializeTransaction } from "@/lib/payments/paystack";
+import { disconnectWhatsApp, reconnectWhatsApp } from "@/lib/channels/whatsapp";
+import { initializeTransaction, fetchSubscription, disableSubscription } from "@/lib/payments/paystack";
 import { getSiteUrl } from "@/lib/site-url";
 
 // All actions here run through the AUTHENTICATED client — RLS
@@ -171,6 +172,38 @@ export async function disconnectInstagramAction(businessId: string): Promise<Act
   return { ok: true, message: "Instagram disconnected." };
 }
 
+export async function disconnectWhatsAppAction(businessId: string): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { data: claims } = await supabase.auth.getClaims();
+  if (!claims?.claims) return { ok: false, message: "Not signed in." };
+
+  const userId = claims.claims.sub as string;
+  const ownBusinessId = await getOwnBusinessId(supabase, userId);
+  if (!ownBusinessId || ownBusinessId !== businessId) {
+    return { ok: false, message: "Could not disconnect — check you have access to this business." };
+  }
+
+  await disconnectWhatsApp(businessId);
+  revalidatePath("/dashboard");
+  return { ok: true, message: "WhatsApp disconnected." };
+}
+
+export async function reconnectWhatsAppAction(businessId: string): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { data: claims } = await supabase.auth.getClaims();
+  if (!claims?.claims) return { ok: false, message: "Not signed in." };
+
+  const userId = claims.claims.sub as string;
+  const ownBusinessId = await getOwnBusinessId(supabase, userId);
+  if (!ownBusinessId || ownBusinessId !== businessId) {
+    return { ok: false, message: "Could not reconnect — check you have access to this business." };
+  }
+
+  const result = await reconnectWhatsApp(businessId);
+  revalidatePath("/dashboard");
+  return result;
+}
+
 // Meta Data Deletion Instructions requirement (META_APP_REVIEW.md §5) —
 // deliberately separate from disconnectInstagramAction above: disconnect is
 // reversible (reconnect picks up where you left off), this is not. Same
@@ -315,4 +348,36 @@ export async function startSubscription(businessId: string, planId: string): Pro
   }
 
   redirect(authorizationUrl);
+}
+
+// Founder request 2026-09-07: a real self-serve cancel — previously the
+// only way to stop being billed was to email us. Deliberately does not
+// flip businesses.plan_status itself: same discipline as startSubscription
+// above, the subscription.disable webhook (api/webhooks/paystack/route.ts)
+// is still the only party that has actually confirmed Paystack processed
+// the cancellation.
+export async function cancelSubscription(businessId: string): Promise<ActionResult> {
+  const supabase = await createClient();
+
+  const { data: business } = await supabase
+    .from("businesses")
+    .select("plan_status, paystack_subscription_code")
+    .eq("id", businessId)
+    .maybeSingle();
+  if (!business) return { ok: false, message: "Could not cancel — check you have access to this business." };
+
+  if (business.plan_status !== "active" || !business.paystack_subscription_code) {
+    return { ok: false, message: "There's no active subscription to cancel." };
+  }
+
+  try {
+    const subscription = await fetchSubscription(business.paystack_subscription_code);
+    await disableSubscription(subscription.subscriptionCode, subscription.emailToken);
+  } catch (error) {
+    console.error("Paystack cancel-subscription failed", error);
+    return { ok: false, message: "Could not cancel — please try again, or email us." };
+  }
+
+  revalidatePath("/dashboard");
+  return { ok: true, message: "Subscription canceled — Engage access stops immediately, no further charges." };
 }

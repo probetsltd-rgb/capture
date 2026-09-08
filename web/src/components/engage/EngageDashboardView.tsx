@@ -4,6 +4,16 @@ import { computePreventSummary } from "@/lib/prevent/summary";
 import { SimulateForm } from "./SimulateForm";
 import { ConversationRow } from "./ConversationRow";
 
+// Founder request 2026-09-08, now that WhatsApp is a real second live
+// channel alongside Instagram: which channel a conversation came in on
+// wasn't visible anywhere in this list — a real gap once there's more
+// than one channel to tell apart.
+const CHANNEL_LABEL: Record<string, string> = {
+  instagram: "Instagram",
+  whatsapp: "WhatsApp",
+  other: "Other",
+};
+
 // Shared body for both /admin/engage/[businessId] (founder, explicit
 // businessId) and /dashboard/engage (business owner, own businessId from
 // session) — extracted 2026-08-15 during the Prevent→Engage rename and
@@ -61,7 +71,7 @@ export async function EngageDashboardView({
 
   const { data: conversations } = await supabase
     .from("conversations")
-    .select("id, state, escalation_reason, escalated_at, assigned_to, qualification, ai_followup_count, customer_id")
+    .select("id, channel, state, escalation_reason, escalated_at, assigned_to, qualification, ai_followup_count, customer_id")
     .eq("business_id", businessId)
     // whatsapp_api + instagram_api — excludes Find's uploaded historical
     // exports (source: manual_export). instagram_api added 2026-08-15 after
@@ -222,6 +232,7 @@ export async function EngageDashboardView({
           <thead>
             <tr >
               <th >Customer</th>
+              <th >Channel</th>
               <th >State</th>
               <th >Action</th>
             </tr>
@@ -230,6 +241,7 @@ export async function EngageDashboardView({
             {convs.map((c) => (
               <tr key={c.id} >
                 <td >{customerNameById.get(c.customer_id) ?? "—"}</td>
+                <td className="meta">{CHANNEL_LABEL[c.channel] ?? c.channel}</td>
                 <td >{c.state}</td>
                 <td >
                   <ConversationRow
