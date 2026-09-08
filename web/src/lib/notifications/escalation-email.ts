@@ -60,6 +60,13 @@ export type EscalationNotification = {
   businessName: string;
   customerName: string | null;
   escalationReason: string;
+  // Founder-caught 2026-09-08: the email never carried what the customer
+  // actually said — a human had to click through to the dashboard just to
+  // see what needed attention. `messageBody` is the exact text that
+  // triggered this escalation (already in scope at the one call site,
+  // process.ts's `processConversationMessage`), shown verbatim so the
+  // email is actionable on its own.
+  messageBody: string;
   conversationUrl: string;
   // Plan's escalation_notification_limit — how many team members (in role
   // priority order) get this email. null = every member.
@@ -87,12 +94,19 @@ export async function sendEscalationNotification(notification: EscalationNotific
     }
 
     const who = notification.customerName ?? "A customer";
+    // Escaped, not interpolated raw into the template — messageBody is
+    // customer-supplied text landing directly in an HTML email body.
+    const escapedMessage = notification.messageBody.replace(
+      /[&<>"']/g,
+      (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!,
+    );
     const { error } = await resend.emails.send({
       from: FROM_ADDRESS,
       to: recipients,
       subject: `${notification.businessName}: a conversation needs you`,
       html: `
         <p><strong>${who}</strong> asked something Engage couldn't safely answer on its own.</p>
+        <blockquote style="margin:0 0 1em;padding-left:12px;border-left:3px solid #ccc;color:#333;">${escapedMessage}</blockquote>
         <p><strong>Reason:</strong> ${notification.escalationReason}</p>
         <p><a href="${notification.conversationUrl}">Open the conversation →</a></p>
       `,

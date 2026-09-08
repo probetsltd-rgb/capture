@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { processInboundMessage } from "./engine";
 import { evaluateSafeResponseGate } from "./safe-response-gate";
 import { sendEscalationNotification } from "@/lib/notifications/escalation-email";
+import { sendEscalationWhatsApp } from "@/lib/notifications/escalation-whatsapp";
 import { getSiteUrl } from "@/lib/site-url";
 import { RESUME_AFTER_SILENCE_MINUTES } from "./timers";
 import { decryptToken } from "@/lib/channels/token-crypto";
@@ -345,7 +346,7 @@ async function processConversationMessage(
     // for why a notification failure must never break the escalation itself.
     const { data: conv } = await supabase
       .from("conversations")
-      .select("customer_id")
+      .select("customer_id, channel")
       .eq("id", conversationId)
       .maybeSingle();
     const { data: customer } = conv?.customer_id
@@ -365,6 +366,18 @@ async function processConversationMessage(
       businessName: (business?.name as string | null) ?? "Your business",
       customerName: (customer?.name as string | null) ?? null,
       escalationReason: reason,
+      messageBody,
+      conversationUrl: `${getSiteUrl()}/dashboard/engage`,
+      recipientLimit,
+    });
+    // Additive alongside email, never a replacement — see
+    // lib/notifications/escalation-whatsapp.ts's own comment for why this
+    // has to be a template send, not plain text.
+    await sendEscalationWhatsApp({
+      businessId,
+      customerName: (customer?.name as string | null) ?? null,
+      channel: (conv?.channel as string | null) ?? "other",
+      messageBody,
       conversationUrl: `${getSiteUrl()}/dashboard/engage`,
       recipientLimit,
     });

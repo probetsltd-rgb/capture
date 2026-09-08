@@ -48,7 +48,8 @@ export default async function DashboardSettingsPage() {
       <section style={{ marginTop: "var(--s8)" }}>
         <h2>Notifications</h2>
         <p className="meta">
-          Add your WhatsApp number so escalation alerts can reach you there in future — email works today.
+          Add your WhatsApp number so escalation alerts can also reach you there, alongside email — only works once
+          your business has WhatsApp connected.
         </p>
         <NotificationPhoneForm
           businessId={businessId}

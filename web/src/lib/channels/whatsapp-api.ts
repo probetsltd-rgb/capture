@@ -180,6 +180,51 @@ export async function sendMediaMessage(
   }
 }
 
+// Founder request 2026-09-08: escalation alerts to a team member's own
+// WhatsApp number — that recipient has essentially never messaged
+// Capture's business number, so this is a business-initiated send outside
+// any 24h session window and MUST go through an approved template, not
+// plain sendMessage() text (confirmed by two real rejections while
+// designing the `escalation_alert` template itself: "Parameters words
+// ratio exceeds limit" for too few fixed words around 4 variables, then
+// "Leading or trailing params not allowed" for ending on a variable —
+// both real, documented Meta template-content rules, not guessed at).
+export async function sendTemplateMessage(
+  accessToken: string,
+  phoneNumberId: string,
+  recipientWaId: string,
+  templateName: string,
+  languageCode: string,
+  bodyParameters: string[],
+): Promise<void> {
+  const response = await fetch(`${GRAPH_BASE}/${phoneNumberId}/messages`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      messaging_product: "whatsapp",
+      recipient_type: "individual",
+      to: recipientWaId,
+      type: "template",
+      template: {
+        name: templateName,
+        language: { code: languageCode },
+        components: [
+          {
+            type: "body",
+            parameters: bodyParameters.map((text) => ({ type: "text", text })),
+          },
+        ],
+      },
+    }),
+  });
+  if (!response.ok) {
+    throw new Error(`WhatsApp template send failed: ${response.status} ${await response.text()}`);
+  }
+}
+
 export type TemplateCategory = "utility" | "marketing" | "authentication";
 
 export type CreatedTemplate = { id: string; status: string; category: string };
