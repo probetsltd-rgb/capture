@@ -1304,10 +1304,12 @@ select.input {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   }
 
-  /* Find naturally has less content than Recover/Prevent's stat tables —
-     let it span the full width above the other two rather than leaving an
-     awkward half-empty cell beside it. */
-  .app-page .app-grid > :first-child {
+  /* Whichever item leads gets the full-width top row, the other two pair
+     up below it — a `.app-grid__lead` class rather than `:first-child`
+     (2026-09-08) since the lead item is now moved to the front visually
+     via CSS `order`, not by being the first item in DOM order, and
+     `:first-child` doesn't follow `order`. */
+  .app-page .app-grid > .app-grid__lead {
     grid-column: 1 / -1;
   }
 }

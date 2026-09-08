@@ -207,7 +207,7 @@ export default async function DashboardPage({
     <main className="shell app-page">
       <h1>{business.name}</h1>
       <p className="meta">
-        {business.industry ?? "No industry set"} · <Link href="/dashboard/settings">Configure rules →</Link>
+        {business.industry ?? "No industry set"} · <Link href="/dashboard/settings">Settings →</Link>
       </p>
 
       {instagramStatus === "connected" && (
@@ -362,7 +362,13 @@ export default async function DashboardPage({
           </div>
         </div>
 
-        <div className="panel">
+        {/* Engage leads, per the whole Engage-first pivot (PLANS.md 5.7) —
+            founder-caught 2026-09-08: this rendered last in the grid,
+            wrapping alone onto its own row below Find+Recover instead of
+            leading. `order` moves it first visually without relocating the
+            large block of markup below (avoids a risky cut-paste of code
+            with real interdependencies on state above it). */}
+        <div className="panel app-grid__lead" style={{ order: -1 }}>
           <div className="panel__head">
             <h2 className="h3" style={{ margin: 0 }}>
               Engage {business.prevent_activated_at ? "· Active" : "· Not activated"}

@@ -37,13 +37,17 @@ export default async function DashboardSettingsPage() {
       <p>
         <Link href="/dashboard">← Back to dashboard</Link>
       </p>
-      <h1>Configure rules — {business.name}</h1>
-      <RulesForm
-        businessId={businessId}
-        maxRecoverFollowups={business.max_recover_followups}
-        escalationKeywords={(business.escalation_keywords as string[] | null) ?? []}
-        platformMaxRecoverFollowups={MAX_AUTOMATIONS_PER_OPPORTUNITY}
-      />
+      <h1>Settings — {business.name}</h1>
+
+      <section>
+        <h2>Rules</h2>
+        <RulesForm
+          businessId={businessId}
+          maxRecoverFollowups={business.max_recover_followups}
+          escalationKeywords={(business.escalation_keywords as string[] | null) ?? []}
+          platformMaxRecoverFollowups={MAX_AUTOMATIONS_PER_OPPORTUNITY}
+        />
+      </section>
 
       <section style={{ marginTop: "var(--s8)" }}>
         <h2>Notifications</h2>
