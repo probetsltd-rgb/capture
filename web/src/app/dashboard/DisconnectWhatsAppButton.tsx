@@ -8,9 +8,12 @@ export function DisconnectWhatsAppButton({ businessId }: { businessId: string })
   const [confirming, setConfirming] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
+  // Founder-caught 2026-09-08: shouldn't visually outweigh "View
+  // conversations"/"Manage approved knowledge" — this is used far less
+  // often than either.
   if (!confirming) {
     return (
-      <button className="btn" onClick={() => setConfirming(true)}>
+      <button className="btn btn--ghost" onClick={() => setConfirming(true)}>
         Disconnect
       </button>
     );

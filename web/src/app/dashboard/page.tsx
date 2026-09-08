@@ -498,10 +498,22 @@ export default async function DashboardPage({
               </tr>
             </tbody>
           </table>
-          <p>
-            <Link href="/dashboard/engage">View conversations →</Link> ·{" "}
-            <Link href="/dashboard/engage/knowledge">Manage approved knowledge →</Link>
-          </p>
+          {/* Founder-caught 2026-09-08: these two — the actions a business
+              owner actually uses day to day — were plain text links below
+              Cancel subscription/Disconnect, which (bare `.btn` with no
+              modifier, falling through to the browser's default gray
+              button chrome, not a deliberate style) visually outweighed
+              them despite being the rarer, higher-friction actions. Given
+              real button styling and moved above the connection table;
+              Cancel/Disconnect demoted to `.btn--ghost` below. */}
+          <div style={{ display: "flex", gap: "var(--s3)", flexWrap: "wrap", marginTop: "var(--s4)" }}>
+            <Link href="/dashboard/engage" className="btn btn--secondary">
+              View conversations →
+            </Link>
+            <Link href="/dashboard/engage/knowledge" className="btn btn--secondary">
+              Manage approved knowledge →
+            </Link>
+          </div>
           {!business.prevent_activated_at && <ActivateButton businessId={businessId} product="prevent" />}
           </div>
         </div>

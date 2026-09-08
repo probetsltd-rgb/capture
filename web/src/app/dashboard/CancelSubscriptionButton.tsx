@@ -11,9 +11,13 @@ export function CancelSubscriptionButton({ businessId }: { businessId: string })
   const [confirming, setConfirming] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
+  // Founder-caught 2026-09-08: a rare, high-friction action shouldn't
+  // visually outweigh "View conversations"/"Manage approved knowledge" —
+  // .btn--ghost keeps it discoverable without making it the loudest thing
+  // on the panel.
   if (!confirming) {
     return (
-      <button className="btn" onClick={() => setConfirming(true)}>
+      <button className="btn btn--ghost" onClick={() => setConfirming(true)}>
         Cancel subscription
       </button>
     );
