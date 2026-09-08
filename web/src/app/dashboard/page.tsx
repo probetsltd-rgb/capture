@@ -466,9 +466,17 @@ export default async function DashboardPage({
                 <td>Instagram</td>
                 <td>
                   {instagramConnection.connected ? (
-                    <span style={{ display: "inline-flex", gap: "var(--s3)", alignItems: "center" }}>
+                    <span style={{ display: "inline-flex", gap: "var(--s3)", alignItems: "center", flexWrap: "wrap" }}>
                       Connected{instagramConnection.username ? ` as @${instagramConnection.username}` : ""}
-                      <Link href="/api/channels/instagram/connect">Reconnect</Link>
+                      {/* Founder-caught 2026-09-08: a bare, unclassed
+                          Link — easy to miss entirely, unlike WhatsApp's
+                          own Reconnect (.btn--primary). .btn--secondary
+                          here since a still-connected account refreshing
+                          its token is lower-urgency than WhatsApp's
+                          reconnect-a-dead-connection case. */}
+                      <Link href="/api/channels/instagram/connect" className="btn btn--secondary">
+                        Reconnect
+                      </Link>
                       <DisconnectInstagramButton businessId={businessId} />
                     </span>
                   ) : (
@@ -480,12 +488,12 @@ export default async function DashboardPage({
                 <td>WhatsApp</td>
                 <td>
                   {whatsappConnection.connected ? (
-                    <span style={{ display: "inline-flex", gap: "var(--s3)", alignItems: "center" }}>
+                    <span style={{ display: "inline-flex", gap: "var(--s3)", alignItems: "center", flexWrap: "wrap" }}>
                       Connected{whatsappConnection.phoneNumber ? ` — ${whatsappConnection.phoneNumber}` : ""}
                       <DisconnectWhatsAppButton businessId={businessId} />
                     </span>
                   ) : whatsappConnection.canReconnect ? (
-                    <span style={{ display: "inline-flex", gap: "var(--s3)", alignItems: "center" }}>
+                    <span style={{ display: "inline-flex", gap: "var(--s3)", alignItems: "center", flexWrap: "wrap" }}>
                       Not connected{whatsappConnection.phoneNumber ? ` — was ${whatsappConnection.phoneNumber}` : ""}
                       <ReconnectWhatsAppButton businessId={businessId} />
                     </span>

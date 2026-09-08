@@ -1299,6 +1299,17 @@ select.input {
   gap: var(--s7);
 }
 
+/* Real mobile overflow bug found 2026-09-08 (audit triggered by a founder
+   request, not caught by any prior pass): grid items default to
+   `min-width: auto`, which resolves to their content's max-content size —
+   a single long unbreakable phrase (e.g. Find's "Upload WhatsApp or
+   Instagram conversations →" link) was enough to widen the implicit
+   single mobile column past the viewport, overflowing the whole page by
+   176px. `min-width: 0` lets items actually shrink to their track. */
+.app-page .app-grid > * {
+  min-width: 0;
+}
+
 @media (min-width: 860px) {
   .app-page .app-grid {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);

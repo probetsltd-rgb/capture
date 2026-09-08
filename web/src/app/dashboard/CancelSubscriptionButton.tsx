@@ -11,13 +11,14 @@ export function CancelSubscriptionButton({ businessId }: { businessId: string })
   const [confirming, setConfirming] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
-  // Founder-caught 2026-09-08: a rare, high-friction action shouldn't
-  // visually outweigh "View conversations"/"Manage approved knowledge" —
-  // .btn--ghost keeps it discoverable without making it the loudest thing
-  // on the panel.
+  // Founder-caught 2026-09-08: shouldn't outweigh "View conversations"/
+  // "Manage approved knowledge", but .btn--ghost (tried first) went too
+  // far the other way — no padding/height at all, so it read as plain
+  // text and could be missed entirely. .btn--secondary is still visibly a
+  // button without competing with the primary actions above it.
   if (!confirming) {
     return (
-      <button className="btn btn--ghost" onClick={() => setConfirming(true)}>
+      <button className="btn btn--secondary" onClick={() => setConfirming(true)}>
         Cancel subscription
       </button>
     );
