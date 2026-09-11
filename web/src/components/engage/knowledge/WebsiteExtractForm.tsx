@@ -44,20 +44,29 @@ export function WebsiteExtractForm({ businessId }: { businessId: string }) {
           onSubmit={(e) => {
             e.preventDefault();
             startTransition(async () => {
-              const result = await extractKnowledgeFromWebsite(businessId, url);
+              // Founder-caught 2026-09-11: type="url" made the browser's
+              // own constraint validation ("Please enter a URL") block a
+              // bare domain like "www.rentit.ng" before this code ever
+              // ran, with wording we don't control. Normalizing a missing
+              // scheme here means both "rentit.ng" and "https://rentit.ng"
+              // reach fetchWebsiteText, whose messages (below) are already
+              // specific about anything that still doesn't work.
+              const normalized = /^https?:\/\//i.test(url.trim()) ? url.trim() : `https://${url.trim()}`;
+              const result = await extractKnowledgeFromWebsite(businessId, normalized);
               setOk(result.ok);
               setMessage(result.message);
             });
           }}
         >
           <p className="meta">
-            Paste your website&apos;s URL. The AI reads the page and proposes individual knowledge items —
-            nothing is used until you review and approve each one below, same as everything else here.
+            Paste your website&apos;s URL — with or without &quot;https://&quot;. The AI reads the page and
+            proposes individual knowledge items — nothing is used until you review and approve each one below,
+            same as everything else here.
           </p>
           <input
-            type="url"
+            type="text"
             name="url"
-            placeholder="https://yourbusiness.com"
+            placeholder="yourbusiness.com"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             required

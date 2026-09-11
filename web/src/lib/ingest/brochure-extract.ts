@@ -27,7 +27,15 @@ const extractionSchema = z.object({
         category: z.enum(CATEGORIES),
         content: z
           .string()
-          .max(300)
+          // Real bug found 2026-09-11 extracting a real business's website
+          // (rentit.ng): a genuine FAQ answer ("What happens if the item is
+          // damaged...") was 315 chars — over the old 300 cap — which
+          // failed Zod validation on the whole response object and
+          // silently discarded all 22 other, valid extracted items along
+          // with it (generateObject has no partial-success mode; one bad
+          // field fails the entire object). 500 gives real prose FAQ
+          // answers headroom a brochure's terser lines rarely need.
+          .max(500)
           .describe("One self-contained fact — a single product with its price/variants, one policy, one FAQ answer, etc. Never combine multiple products into one item."),
       }),
     )
@@ -164,7 +172,15 @@ export async function extractKnowledgeItems(
     });
     return object.items;
   } catch (error) {
-    if (NoObjectGeneratedError.isInstance(error)) return null;
+    // This failure mode is otherwise a total black box (2026-09-11: took a
+    // real reproduction against a real website to find that a single
+    // over-length field discarded 22 otherwise-valid extracted items) —
+    // log the actual validation cause so a recurrence shows up in Vercel
+    // logs instead of just the generic user-facing message.
+    if (NoObjectGeneratedError.isInstance(error)) {
+      console.error("extractKnowledgeItems: model output failed schema validation", error.cause);
+      return null;
+    }
     throw error;
   }
 }
