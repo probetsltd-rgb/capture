@@ -1018,3 +1018,31 @@ Founder asked to build an FAQ for both pages, following up on the organic-discov
 | 2026-08-30 | Production check | e2e (real production) | Pass | Both pages return the expected FAQ text and `FAQPage` type live; `/` → 200, `/dashboard` (unauth) → 307. |
 
 **Bonus fix found while in `find/layout.tsx`**: its metadata description still said "in about a minute" — stale since the on-page copy was corrected to the real 10–15 minute figure in `DEV-26`; fixed in the same deploy.
+
+## Dashboard Button Hierarchy Re-fix + Full Authenticated-Surface Mobile Audit (DEV-44)
+
+Founder caught the previous button-hierarchy pass (`.btn--ghost` for Cancel subscription, an untouched bare `<Link>` for Instagram's Reconnect) overcorrecting into looking like plain text. Same request also asked for a full mobile-optimization pass across "dashboard and entire build."
+
+| Date | Test | Type | Result | Notes |
+|---|---|---|---|---|
+| 2026-09-08 | `tsc --noEmit` | build | Pass | Clean, at each of the three incremental deploys below. |
+| 2026-09-08 | `next build` | build | Pass | Clean at each deploy. |
+| 2026-09-08 | Real business-owner session (`support@capture.com.ng`) via `generate_link`/`email_otp` | e2e (real auth) | Pass | Same technique proven in `DEV-31`/`DEV-32` — OTP fetched only after clicking "Send code" in the real UI. |
+| 2026-09-08 | Same-origin-iframe audit at 390px across `/`, `/find`, `/recover`, `/login`, `/signup`, `/privacy`, `/data-deletion`, `/dashboard`, `/dashboard/engage`, `/dashboard/engage/knowledge`, `/dashboard/settings`, `/dashboard/recover` | integration (real production) | 2 real bugs found, both fixed | `/dashboard` overflowed 176px (`.app-grid` items had no `min-width` override — an unbreakable Find link phrase widened the whole mobile column); fixing that exposed the Engage panel's stat table overflowing 159px (un-wrapped `inline-flex` connection-status rows). Fixed with `.app-page .app-grid > * { min-width: 0; }` and `flexWrap: "wrap"` on the three status rows respectively. Re-audited clean after each fix. |
+| 2026-09-08 | Real platform-admin session (`probetsltd@gmail.com`) via the same technique | e2e (real auth) | Pass | Required a fresh OTP fetch after re-clicking "Send code" — the first fetch predated the click and was stale. |
+| 2026-09-08 | Same audit across `/admin`, `/admin/whatsapp-templates`, `/admin/plans`, `/admin/recover-plans`, `/admin/engage/[id]`, `/admin/engage/[id]/knowledge` | integration (real production) | Pass | Clean, no overflow. |
+| 2026-09-08 | Deploy | — | — | Three incremental production deploys: button fix, `.app-grid` fix, `flexWrap` fix — `capture-cdtqh9r0f...`, `capture-r2sdbk93s...`, `capture-59seekdm3...`. |
+
+## Website-Knowledge-Extraction Bugs — Bare-Domain URL + Silent Whole-Batch Loss (DEV-45)
+
+Founder reported two issues from real usage against `rentit.ng`, via screenshots (found at `~/Documents/Screenshot 2026-09-11 at 12.23.05.png` and `12.23.44.png`): a bare-domain URL got a generic browser error, and a `https://` URL failed extraction with no explanation. Both root-caused by direct reproduction before fixing, not guessed at.
+
+| Date | Test | Type | Result | Notes |
+|---|---|---|---|---|
+| 2026-09-11 | Direct reproduction: fetched `rentit.ng`'s real HTML, ran the app's own `htmlToText`, ran the exact `generateObject` call (same model, schema, prompt) in a standalone script against the real AI Gateway | integration (real infra, outside the app) | Reproduced both bugs | Bug 1: `type="url"` input's native browser validation rejects `www.rentit.ng` (no scheme) with an uncustomizable "Please enter a URL" tooltip, before the app's own already-specific `website-extract.ts` messages ever run. Bug 2: the model correctly extracted 22 real facts, but one genuine FAQ answer was 315 chars against the schema's `content.max(300)` — `generateObject` has no partial-success mode, so the whole object failed Zod validation and all 22 items were silently discarded, surfacing only "Could not extract knowledge items from that page." |
+| 2026-09-11 | `tsc --noEmit` / `eslint` | build/static | Pass | Clean after both fixes (`type="text"` + client-side `https://` normalization; schema cap raised 300→500 with a `console.error` on any future `NoObjectGeneratedError`). |
+| 2026-09-11 | Re-ran the same standalone reproduction script against the fixed 500-char cap | integration (real infra) | Pass | 25 items extracted, none discarded. |
+| 2026-09-11 | `next build` | build | Pass | Clean. |
+| 2026-09-11 | Deploy | — | — | `vercel --prod`: `dpl_EyNxL8U2kUncUvDA5SepX3AS9RCc`. |
+| 2026-09-11 | Real `support@capture.com.ng` session (`generate_link`/`email_otp`, `DEV-31`'s technique), real browser, typed the exact originally-failing bare-domain input `www.rentit.ng` into the live production UI | e2e (real production) | Pass | No browser validation blocked submission; "Extracted 29 items from that page — review them below before they're used" rendered for real. |
+| 2026-09-11 | Cleanup | — | — | The 29 real (Rentit-specific, not Capture's own) pending rows this test write created in Capture's live knowledge base were deleted via a service-role script scoped to the exact insert timestamp; confirmed zero unapproved rows remained afterward. |
