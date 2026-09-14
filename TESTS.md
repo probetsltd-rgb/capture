@@ -1087,4 +1087,20 @@ A real live test in `DEV-47` surfaced a real bug: the founder's own WhatsApp rep
 | 2026-09-14 | Data fix: both stale `knowledge_items` rows updated (`Engage Basic` → `Engage Starter`, `Engage Standard` → `Engage Growth`), scoped to Capture's own `business_id` only | integration (real infra) | Pass | Read back post-update: both rows now read correctly. Full-codebase grep for hardcoded "Basic"/"Standard" plan-name strings found none — `plans.display_name` (already "Starter"/"Growth") was the only place that needed no code change. |
 | 2026-09-14 | Deploy | — | — | `vercel --prod`: `dpl_6YeYvAaMMtdayk5RCGZMDuBGs8XY`. |
 
-**Honestly scoped, not fully live-fire verified**: no real end-to-end test (real notification send → simulated real swipe-reply → real dispatch to the original Instagram conversation) was run this session — offered to the founder rather than assumed, since it would fire another real WhatsApp message and a real Instagram DM as a side effect.
+**Honestly scoped, not fully live-fire verified**: no real end-to-end test (real notification send → simulated real swipe-reply → real dispatch to the original Instagram conversation) was run this session — offered to the founder rather than assumed, since it would fire another real WhatsApp message and a real Instagram DM as a side effect. **Closed same day — see below.**
+
+## Live-Fire End-to-End Verification of Cross-Channel Reply Threading (DEV-49)
+
+Founder asked to run the live-fire test `DEV-48` had deliberately held back.
+
+| Date | Test | Type | Result | Notes |
+|---|---|---|---|---|
+| 2026-09-14 | Real `notifyHandlerWhatsApp` fired (temporary debug route, deleted after) for the real "Hi" Instagram conversation (`3d87e818-…`) | integration (real infra, real recipient) | Pass | Real wamid returned and correctly recorded in `whatsapp_reply_routes` (`select` confirmed the exact row). |
+| 2026-09-14 | Real, HMAC-signed inbound webhook payload (`WHATSAPP_APP_SECRET`) simulating a swipe-reply — `context.id` set to that exact wamid, `from` the founder's real number, unique test body — POSTed to the real `api/channels/whatsapp/webhook` route on a local dev server | integration (real infra, real signature verification) | Pass | `200 EVENT_RECEIVED` (signature accepted); async `after()` processing completed with no error logged. |
+| 2026-09-14 | DB confirmation: `messages` for conversation `3d87e818-…`, most recent 3 rows | integration (real infra) | Pass | Exact test body landed as `sender_type: "business"`, `external_message_id` set to the simulated inbound wamid (idempotency guard confirmed wired correctly) — on the *original* Instagram conversation, not a new one. |
+| 2026-09-14 | DB confirmation: `conversations` state for `3d87e818-…` | integration (real infra) | Pass | `human_taken_at` refreshed, `assigned_to` still `support@capture.com.ng` — `takeConversation` fired as designed. |
+| 2026-09-14 | DB confirmation: no new `customers` row with the founder's phone number this time (`external_customer_id like '%7037123201%'`) | integration (real infra) | Pass | Zero rows — `DEV-47`'s incident (a stray customer/conversation created) confirmed NOT reproduced. This is the exact bug the whole `DEV-46`→`DEV-49` chain exists to fix. |
+| 2026-09-14 | Cleanup: temporary debug route deleted, local dev server killed by exact PID (not `pkill -f`) | — | — | `git status` confirmed the route was never committed. |
+| 2026-09-14 | `next build` (post-cleanup) | build | Pass | Clean. |
+
+**Scope note**: the real Instagram DM dispatch (`sendHumanReply`'s `sendMessage` call to Meta's Instagram API) ran for real as part of this test and threw no error — not independently re-confirmed by re-fetching Instagram's own side of the conversation, same reasoning `DEV-47`'s WhatsApp send used.
