@@ -1118,3 +1118,14 @@ Founder screenshot: `/signup`'s nav read "Dashboard" while believing they were s
 | 2026-09-14 | Cleanup: forged token removed from `localStorage`, tab closed, dev server killed by exact PID | — | — | Confirmed process no longer running. |
 | 2026-09-14 | `next build` (post-cleanup) | build | Pass | Clean. |
 | 2026-09-14 | Deploy | — | — | `vercel --prod`: `dpl_CF7ux8LA2HYj7Dixm3zXCapE6mnz`. |
+
+## Warmer First-Reply Greeting — "Hi {name}" (DEV-51)
+
+Founder: a first reply should say "Hi (name)" rather than a generic "Hi there" when the customer's name is known.
+
+| Date | Test | Type | Result | Notes |
+|---|---|---|---|---|
+| 2026-09-14 | `next build` after adding `buildGreetingBlock`, threading `customerName`/`isFirstMessage` through `engine.ts` and `process.ts` | build | Pass | Clean. |
+| 2026-09-14 | Real, unmocked `processInboundMessage` called via a temporary debug route against Capture's own real approved knowledge (`Engage Starter`/`Engage Growth`), three cases in one pass | integration (real model, real AI Gateway) | Pass | (1) First message, name "Chidinma" known → `"Hi Chidinma. The Growth plan is ₦59,000 per month..."`. (2) Same first message, name unknown → answered directly with no invented name and no generic "Hi there" fallback. (3) A second message from the same named customer (`isFirstMessage: false`) → no greeting at all, straight into the answer — confirms the greeting doesn't repeat mid-conversation. |
+| 2026-09-14 | Cleanup: temporary debug route deleted, local dev server killed by exact PID | — | — | `git status` confirmed the route was never committed. |
+| 2026-09-14 | `next build` (post-cleanup) | build | Pass | Clean. |

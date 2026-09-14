@@ -41,6 +41,25 @@ function buildCompletenessBlock(knowledgeBaseConfirmedCompleteAt: string | null)
   return `This business has NOT confirmed their approved knowledge is a complete catalog — treat every product/service list above as partial, not exhaustive. A specific item not being listed is not evidence the business doesn't offer it.`;
 }
 
+// Founder request 2026-09-14: "Hi there" on a first reply reads impersonal
+// next to a real customer's actual name — a warmer, more human opening
+// costs nothing when the name is already known (WhatsApp gives a real
+// profile name on the very first message; Instagram's real-time webhook
+// mostly doesn't — see instagram.ts's own "deliberate gap" note — so this
+// is a real name when available, not a guess). Deliberately scoped to only
+// the FIRST message in a conversation: repeating "Hi {name}" on every
+// single reply in a back-and-forth would read as robotic in the opposite
+// direction, not warmer.
+function buildGreetingBlock(customerName: string | null, isFirstMessage: boolean): string {
+  if (!isFirstMessage) {
+    return `This is not the customer's first message in this conversation — you're mid-conversation, so don't open with a greeting at all, just respond naturally.`;
+  }
+  if (customerName) {
+    return `This is the customer's first message in this conversation, and their name is known: ${customerName}. If you open with a greeting, use their name ("Hi ${customerName}" or a natural equivalent) rather than a generic "Hi there" — warmer for a first reply.`;
+  }
+  return `This is the customer's first message in this conversation, but their name isn't known yet — greet naturally if you open with one, without inventing a name.`;
+}
+
 const SYSTEM_PROMPT = `You are Capture's Engage response engine for a business's WhatsApp/Instagram enquiries. You answer customer messages using ONLY the business's approved knowledge provided below — never your own general knowledge, never a guess, never an assumption.
 
 Classify every message into one of four answerability tiers:
@@ -61,6 +80,7 @@ Hard rules, no exceptions:
 7. For tier A or B, keep response concise and only include what's needed to answer — do not pad it.
 8. Extract qualification fields (name, product/service, location, relevant date, contact details) ONLY when the customer actually stated them in this message. Leave a field null if it wasn't mentioned — never guess or infer it.
 9. Write like a real person replying on their phone, not like an AI assistant. No emojis, ever. Never use a double hyphen ("--") — use a period, a comma, or just start a new sentence instead. Keep it short and plain, the way a busy business owner would actually type a reply, not a formal or corporate tone.
+10. {{GREETING}}
 
 Approved knowledge for this business:
 {{KNOWLEDGE}}`;
@@ -75,6 +95,8 @@ export async function processInboundMessage(
   knowledgeItems: KnowledgeItemForEngine[],
   extraEscalationKeywords: string[] = [],
   knowledgeBaseConfirmedCompleteAt: string | null = null,
+  customerName: string | null = null,
+  isFirstMessage: boolean = false,
 ): Promise<EngineResponse | null> {
   // Deterministic pass first (PRD §42) — cheap, reliable, and catches the
   // clearest cases without waiting on a model call.
@@ -105,10 +127,9 @@ export async function processInboundMessage(
     };
   }
 
-  const system = SYSTEM_PROMPT.replace("{{KNOWLEDGE}}", buildKnowledgeContext(knowledgeItems)).replace(
-    "{{KB_COMPLETENESS}}",
-    buildCompletenessBlock(knowledgeBaseConfirmedCompleteAt),
-  );
+  const system = SYSTEM_PROMPT.replace("{{KNOWLEDGE}}", buildKnowledgeContext(knowledgeItems))
+    .replace("{{KB_COMPLETENESS}}", buildCompletenessBlock(knowledgeBaseConfirmedCompleteAt))
+    .replace("{{GREETING}}", buildGreetingBlock(customerName, isFirstMessage));
 
   try {
     const { object } = await generateObject({

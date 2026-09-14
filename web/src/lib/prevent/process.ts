@@ -256,7 +256,7 @@ async function processConversationMessage(
   // with generic boilerplate no business ever confirmed. Answering from an
   // unapproved row would break the one guarantee Prevent makes — that every
   // statement to a customer came from knowledge the business approved.
-  const [{ data: knowledge }, { data: business }] = await Promise.all([
+  const [{ data: knowledge }, { data: business }, { data: convForGreeting }, { count: customerMessageCount }] = await Promise.all([
     supabase
       .from("knowledge_items")
       .select("category, question, content, media_url")
@@ -269,9 +269,20 @@ async function processConversationMessage(
       )
       .eq("id", businessId)
       .maybeSingle(),
+    supabase.from("conversations").select("customer_id").eq("id", conversationId).maybeSingle(),
+    // Founder request 2026-09-14: a warmer "Hi {name}" opener, but only on
+    // the customer's actual first message — the current message is already
+    // stored by the time this runs (handleInboundMessage inserts it before
+    // calling processConversationMessage), so a count of 1 means this is it.
+    supabase.from("messages").select("id", { count: "exact", head: true }).eq("conversation_id", conversationId).eq("sender_type", "customer"),
   ]);
   const extraEscalationKeywords = (business?.escalation_keywords as string[] | null) ?? [];
   const knowledgeBaseConfirmedCompleteAt = (business?.knowledge_base_confirmed_complete_at as string | null) ?? null;
+  const { data: customerForGreeting } = convForGreeting?.customer_id
+    ? await supabase.from("customers").select("name").eq("id", convForGreeting.customer_id).maybeSingle()
+    : { data: null };
+  const customerName = (customerForGreeting?.name as string | null) ?? null;
+  const isFirstMessage = (customerMessageCount ?? 0) <= 1;
 
   const billingGateReason = business
     ? checkBillingGate({
@@ -323,6 +334,8 @@ async function processConversationMessage(
     knowledge ?? [],
     extraEscalationKeywords,
     knowledgeBaseConfirmedCompleteAt,
+    customerName,
+    isFirstMessage,
   );
 
   // Re-check immediately before committing — this is the actual kill
