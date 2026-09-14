@@ -6,6 +6,10 @@ import { sendEscalationNotification } from "@/lib/notifications/escalation-email
 import { sendEscalationWhatsApp } from "@/lib/notifications/escalation-whatsapp";
 import { notifyHandler } from "@/lib/notifications/handler-notification";
 import { getSiteUrl } from "@/lib/site-url";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { decryptToken } from "@/lib/channels/token-crypto";
+import { sendMessage as sendInstagramMessage, sendMediaMessage as sendInstagramMedia, inferMediaType as inferInstagramMediaType } from "@/lib/channels/instagram-api";
+import { sendMessage as sendWhatsAppMessage, sendMediaMessage as sendWhatsAppMedia, inferMediaType as inferWhatsAppMediaType } from "@/lib/channels/whatsapp-api";
 
 // The kill switch (PRD §23: "when a human takes over, AI stops") is
 // enforced here, not just hidden behind a UI button — a conversation is
@@ -20,14 +24,16 @@ import { getSiteUrl } from "@/lib/site-url";
 // RESUME_AFTER_SILENCE_MINUTES. Reverted: the AI has no way to know what a
 // handler already said off-script, so silently picking the conversation
 // back up risked contradicting or duplicating a human reply it never saw.
-// The kill switch is permanent again — once human_handling, only "Take
-// Conversation" (already-taken) or the team's own reply changes that. What
-// DID survive from that decision: a customer's reply now proactively pings
-// the assigned handler (see the isHumanActive branch below and
-// lib/notifications/handler-notification.ts), plus a one-time reminder if
-// they're still quiet after HANDLER_REMINDER_MINUTES (timers.ts,
-// api/cron/handler-reminders) — escalating the human, never resuming the
-// AI. Terms & Privacy and the homepage FAQ were updated back to match.
+// The kill switch is permanent again by default — once human_handling,
+// nothing automatic changes that. What DID survive from that decision: a
+// customer's reply now proactively pings the assigned handler (see the
+// isHumanActive branch below and lib/notifications/handler-notification.ts),
+// plus a one-time reminder if they're still quiet after
+// HANDLER_REMINDER_MINUTES (timers.ts, api/cron/handler-reminders) —
+// escalating the human, never resuming the AI on its own. Terms & Privacy
+// and the homepage FAQ were updated back to match. A human CAN still hand a
+// conversation back explicitly, though — releaseToAI() below, wired to a
+// "Release to AI" button, added the same day once the founder asked for it.
 
 async function getConversationStatus(
   supabase: SupabaseClient,
@@ -490,4 +496,128 @@ export async function sendHandlerReminder(supabase: SupabaseClient, businessId: 
   });
 
   await supabase.from("conversations").update({ handler_reminder_sent_at: new Date().toISOString() }).eq("id", conversationId);
+}
+
+// Founder request 2026-09-14: the kill switch above is permanent by
+// default, but a handler needs a deliberate way to hand a resolved-or-stuck
+// conversation back to Engage rather than it staying human-owned forever
+// with no release path. Unlike the old, automatic resumeSilentConversation
+// (removed earlier the same day) this is always an explicit human action —
+// never a timer — so there's no risk of the AI reclaiming a conversation
+// mid-negotiation without anyone deciding that's what should happen.
+//
+// Reads the latest message BEFORE writing anything: if it's still an
+// unanswered customer message, that's exactly what resumeSilentConversation
+// used to replay, so the customer gets a real answer immediately rather
+// than waiting for their next message; if the team already replied (or
+// there's nothing yet), releasing is a pure state change with nothing to
+// answer. Inserting the visible `system` marker before that replay (rather
+// than after) mirrors resumeSilentConversation's own ordering — the note
+// that Engage was reactivated should read as happening before whatever it
+// says immediately after.
+export async function releaseToAI(
+  supabase: SupabaseClient,
+  businessId: string,
+  conversationId: string,
+): Promise<InboundResult> {
+  const { data: latestMessage } = await supabase
+    .from("messages")
+    .select("sender_type, body")
+    .eq("conversation_id", conversationId)
+    .order("sent_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  await supabase
+    .from("conversations")
+    .update({ human_taken_at: null, assigned_to: null, handler_reminder_sent_at: null, state: "ai_handling" })
+    .eq("id", conversationId);
+  await supabase.from("messages").insert({
+    business_id: businessId,
+    conversation_id: conversationId,
+    sender_type: "system",
+    body: "Your team released this conversation back to Engage.",
+    sent_at: new Date().toISOString(),
+  });
+
+  if (latestMessage?.sender_type !== "customer" || !latestMessage.body) {
+    return { status: "suppressed_human_active" }; // nothing unanswered to reprocess — release is complete as-is
+  }
+
+  const result = await processConversationMessage(supabase, businessId, conversationId, latestMessage.body);
+
+  // Same reasoning resumeSilentConversation had: processConversationMessage
+  // only decides and stores what the AI would say — a live webhook request
+  // normally dispatches the reply itself right after calling it. This call
+  // site has no such caller, so a "responded" result has to send itself, or
+  // the customer would see the reply sitting in the dashboard and never
+  // actually receive it.
+  if (result.status === "responded") {
+    await dispatchResponse(businessId, conversationId, result.response, result.mediaUrl);
+  }
+
+  return result;
+}
+
+// Dispatches an AI response generated outside the normal webhook request
+// (currently only releaseToAI above) to the customer on their real channel.
+// Handles both Instagram and WhatsApp — unlike its now-removed predecessor,
+// which only ever supported Instagram (written before WhatsApp ingestion
+// existed); parity with sendHumanReply's own two branches (human-reply.ts),
+// which have supported both since DEV-35.
+//
+// Deliberately instantiates its own service-role client rather than using
+// whatever `supabase` was passed to releaseToAI — channel_connections has
+// zero RLS policies for `authenticated` by design (its own migration's
+// header comment: holds an OAuth token, so only the service-role client
+// can read it at all). releaseToAI can be called with either an
+// RLS-scoped session client (from the dashboard's server action, same as
+// takeConversation/closeConversation) or a service-role one; using the
+// passed-in client here would silently no-op on the RLS-scoped path
+// (`.maybeSingle()` returning nothing, not an error) rather than actually
+// sending the reply — the same discipline sendHumanReply, sendEscalation-
+// Notification, and sendEscalationWhatsApp already each follow for exactly
+// this reason.
+async function dispatchResponse(
+  businessId: string,
+  conversationId: string,
+  response: string,
+  mediaUrl: string | null,
+): Promise<void> {
+  const supabase = createServiceRoleClient();
+  const { data: conversation } = await supabase
+    .from("conversations")
+    .select("channel, customer_id")
+    .eq("id", conversationId)
+    .maybeSingle();
+  if (!conversation?.customer_id) return;
+
+  const { data: customer } = await supabase
+    .from("customers")
+    .select("external_customer_id")
+    .eq("id", conversation.customer_id)
+    .maybeSingle();
+  if (!customer?.external_customer_id) return;
+
+  const channel = conversation.channel as string;
+  if (channel !== "instagram" && channel !== "whatsapp") return;
+
+  const { data: connection } = await supabase
+    .from("channel_connections")
+    .select("access_token_encrypted, external_account_id")
+    .eq("business_id", businessId)
+    .eq("channel", channel)
+    .is("disconnected_at", null)
+    .maybeSingle();
+  if (!connection) return;
+
+  const accessToken = decryptToken(connection.access_token_encrypted);
+  const send = channel === "instagram" ? sendInstagramMessage : sendWhatsAppMessage;
+  const sendMedia = channel === "instagram" ? sendInstagramMedia : sendWhatsAppMedia;
+  const inferMediaType = channel === "instagram" ? inferInstagramMediaType : inferWhatsAppMediaType;
+
+  await send(accessToken, connection.external_account_id, customer.external_customer_id, response);
+  if (mediaUrl) {
+    await sendMedia(accessToken, connection.external_account_id, customer.external_customer_id, mediaUrl, inferMediaType(mediaUrl));
+  }
 }

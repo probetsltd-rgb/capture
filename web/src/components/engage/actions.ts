@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { checkRateLimit } from "@/lib/rate-limit";
-import { handleInboundMessage, takeConversation, type InboundResult } from "@/lib/prevent/process";
+import { handleInboundMessage, takeConversation, releaseToAI, type InboundResult } from "@/lib/prevent/process";
 import { sendHumanReply } from "@/lib/prevent/human-reply";
 import { extractKnowledgeItems } from "@/lib/ingest/brochure-extract";
 import { redactPii } from "@/lib/classification/redact";
@@ -153,6 +153,25 @@ export async function markTakeConversation(businessId: string, conversationId: s
   await takeConversation(supabase, conversationId, email);
   revalidateEngagePaths(businessId);
   return { ok: true, message: "Conversation taken — AI will not respond further." };
+}
+
+// Founder request 2026-09-14: the kill switch is permanent by default (see
+// process.ts's top-of-file note) — this is the one deliberate way to
+// reverse it, always an explicit click, never automatic. RLS-governed
+// pre-check before falling through to releaseToAI, same discipline as
+// sendConversationReply below.
+export async function releaseConversationToAI(businessId: string, conversationId: string): Promise<SimulateResult> {
+  const supabase = await createClient();
+  const { data: business } = await supabase.from("businesses").select("id").eq("id", businessId).maybeSingle();
+  if (!business) return { ok: false, message: "No business visible with this ID." };
+
+  const result = await releaseToAI(supabase, businessId, conversationId);
+  revalidateEngagePaths(businessId);
+
+  if (result.status === "responded") return { ok: true, message: "Released — Engage answered the customer's unanswered message." };
+  if (result.status === "escalated") return { ok: true, message: `Released — but Engage re-escalated it: ${result.reason}` };
+  if (result.status === "billing_gated") return { ok: true, message: `Released — but billing is gated: ${result.reason}` };
+  return { ok: true, message: "Released back to Engage." };
 }
 
 export async function closeConversation(businessId: string, conversationId: string): Promise<SimulateResult> {

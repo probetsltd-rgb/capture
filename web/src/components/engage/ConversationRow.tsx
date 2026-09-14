@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { markTakeConversation, closeConversation, sendConversationReply, getConversationMessages } from "./actions";
+import { markTakeConversation, releaseConversationToAI, closeConversation, sendConversationReply, getConversationMessages } from "./actions";
 
 type MessageForThread = { sender_type: string; body: string | null; sent_at: string };
 
@@ -163,6 +163,19 @@ export function ConversationRow({
         <span className="meta">Taken by {assignedTo}</span>
         <MessageThread businessId={businessId} conversationId={conversationId} messages={messages} />
         <ReplyForm businessId={businessId} conversationId={conversationId} />
+        <button
+          className="btn"
+          disabled={pending}
+          onClick={() =>
+            startTransition(async () => {
+              const result = await releaseConversationToAI(businessId, conversationId);
+              setMessage(result.message);
+            })
+          }
+        >
+          Release to AI
+        </button>
+        {message && <span className="meta">{message}</span>}
       </div>
     );
   }

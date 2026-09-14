@@ -116,7 +116,7 @@ async function findAssignedHandlerWhatsAppNumber(businessId: string, assignedTo:
   return null;
 }
 
-async function notifyHandlerWhatsApp(n: HandlerNotification): Promise<void> {
+export async function notifyHandlerWhatsApp(n: HandlerNotification): Promise<void> {
   try {
     const supabase = createServiceRoleClient();
     const { data: connection } = await supabase
