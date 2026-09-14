@@ -1,6 +1,6 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { processInboundMessage } from "./engine";
+import { processInboundMessage, type ConversationHistoryMessage } from "./engine";
 import { evaluateSafeResponseGate } from "./safe-response-gate";
 import { sendEscalationNotification } from "@/lib/notifications/escalation-email";
 import { sendEscalationWhatsApp } from "@/lib/notifications/escalation-whatsapp";
@@ -34,6 +34,18 @@ import { sendMessage as sendWhatsAppMessage, sendMediaMessage as sendWhatsAppMed
 // and the homepage FAQ were updated back to match. A human CAN still hand a
 // conversation back explicitly, though — releaseToAI() below, wired to a
 // "Release to AI" button, added the same day once the founder asked for it.
+
+// Founder request 2026-09-14: the engine was answering every turn fresh,
+// with zero memory of what had already been said in the conversation — so
+// a question the customer already answered (to a human or to the AI
+// itself) could get asked again, most visibly right after a human-handled
+// stretch gets released back to Engage (releaseToAI below), but really on
+// any multi-turn conversation. Capped, not unbounded — bounds prompt size/
+// cost on a long-running conversation; 20 is generous for the real
+// conversation lengths this project has actually seen (TESTS.md: Rentit's
+// 42 conversations/281 messages, so well under 7 messages/conversation on
+// average) while still covering a genuinely long back-and-forth.
+const HISTORY_MESSAGE_LIMIT = 20;
 
 async function getConversationStatus(
   supabase: SupabaseClient,
@@ -256,26 +268,38 @@ async function processConversationMessage(
   // with generic boilerplate no business ever confirmed. Answering from an
   // unapproved row would break the one guarantee Prevent makes — that every
   // statement to a customer came from knowledge the business approved.
-  const [{ data: knowledge }, { data: business }, { data: convForGreeting }, { count: customerMessageCount }] = await Promise.all([
-    supabase
-      .from("knowledge_items")
-      .select("category, question, content, media_url")
-      .eq("business_id", businessId)
-      .not("approved_at", "is", null),
-    supabase
-      .from("businesses")
-      .select(
-        "name, escalation_keywords, knowledge_base_confirmed_complete_at, plan_id, plan_status, trial_started_at, trial_ends_at, current_period_end",
-      )
-      .eq("id", businessId)
-      .maybeSingle(),
-    supabase.from("conversations").select("customer_id").eq("id", conversationId).maybeSingle(),
-    // Founder request 2026-09-14: a warmer "Hi {name}" opener, but only on
-    // the customer's actual first message — the current message is already
-    // stored by the time this runs (handleInboundMessage inserts it before
-    // calling processConversationMessage), so a count of 1 means this is it.
-    supabase.from("messages").select("id", { count: "exact", head: true }).eq("conversation_id", conversationId).eq("sender_type", "customer"),
-  ]);
+  const [{ data: knowledge }, { data: business }, { data: convForGreeting }, { count: customerMessageCount }, { data: recentMessagesDesc }] =
+    await Promise.all([
+      supabase
+        .from("knowledge_items")
+        .select("category, question, content, media_url")
+        .eq("business_id", businessId)
+        .not("approved_at", "is", null),
+      supabase
+        .from("businesses")
+        .select(
+          "name, escalation_keywords, knowledge_base_confirmed_complete_at, plan_id, plan_status, trial_started_at, trial_ends_at, current_period_end",
+        )
+        .eq("id", businessId)
+        .maybeSingle(),
+      supabase.from("conversations").select("customer_id").eq("id", conversationId).maybeSingle(),
+      // Founder request 2026-09-14: a warmer "Hi {name}" opener, but only on
+      // the customer's actual first message — the current message is already
+      // stored by the time this runs (handleInboundMessage inserts it before
+      // calling processConversationMessage), so a count of 1 means this is it.
+      supabase.from("messages").select("id", { count: "exact", head: true }).eq("conversation_id", conversationId).eq("sender_type", "customer"),
+      // Founder request 2026-09-14: conversation history for the engine (see
+      // HISTORY_MESSAGE_LIMIT above) — most-recent-first with a cap, reversed
+      // below into chronological order. The current message is already the
+      // newest row here; dropped below since it's passed to the engine
+      // separately, not duplicated inside the history transcript.
+      supabase
+        .from("messages")
+        .select("sender_type, body")
+        .eq("conversation_id", conversationId)
+        .order("sent_at", { ascending: false })
+        .limit(HISTORY_MESSAGE_LIMIT),
+    ]);
   const extraEscalationKeywords = (business?.escalation_keywords as string[] | null) ?? [];
   const knowledgeBaseConfirmedCompleteAt = (business?.knowledge_base_confirmed_complete_at as string | null) ?? null;
   const { data: customerForGreeting } = convForGreeting?.customer_id
@@ -283,6 +307,11 @@ async function processConversationMessage(
     : { data: null };
   const customerName = (customerForGreeting?.name as string | null) ?? null;
   const isFirstMessage = (customerMessageCount ?? 0) <= 1;
+  const history: ConversationHistoryMessage[] = (recentMessagesDesc ?? [])
+    .slice()
+    .reverse()
+    .slice(0, -1) // drop the current message — already passed to the engine separately
+    .map((m) => ({ senderType: m.sender_type as string, body: m.body as string | null }));
 
   const billingGateReason = business
     ? checkBillingGate({
@@ -336,6 +365,7 @@ async function processConversationMessage(
     knowledgeBaseConfirmedCompleteAt,
     customerName,
     isFirstMessage,
+    history,
   );
 
   // Re-check immediately before committing — this is the actual kill
