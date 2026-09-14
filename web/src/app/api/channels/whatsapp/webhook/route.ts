@@ -3,7 +3,9 @@ import crypto from "node:crypto";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { getConnectionByPhoneNumberId, findOrCreateConversationForInboundMessage } from "@/lib/channels/whatsapp";
 import { sendMessage, sendMediaMessage, inferMediaType } from "@/lib/channels/whatsapp-api";
-import { handleInboundMessage } from "@/lib/prevent/process";
+import { handleInboundMessage, takeConversation } from "@/lib/prevent/process";
+import { sendHumanReply } from "@/lib/prevent/human-reply";
+import { resolveWhatsAppReplyRoute, resolveHandlerEmailByWhatsAppNumber } from "@/lib/notifications/whatsapp-reply-routing";
 
 // WhatsApp Cloud API webhook receiver. Deliberately its own route, not a
 // branch inside the Instagram one — the payload shape is genuinely
@@ -23,6 +25,12 @@ type WhatsAppMessage = {
   timestamp: string;
   type: string;
   text?: { body: string };
+  // Present only when the sender used WhatsApp's native "swipe to reply"
+  // quote gesture on a specific earlier message — DEV-48's cross-channel
+  // reply routing keys off `context.id` to recognize a reply to a
+  // notification Capture itself sent. Confirmed against Meta's current
+  // WhatsApp Cloud API docs during this build, not assumed.
+  context?: { from: string; id: string };
 };
 type WhatsAppValue = {
   metadata: { phone_number_id: string; display_phone_number?: string };
@@ -133,6 +141,32 @@ async function processOneMessage(value: WhatsAppValue, message: WhatsAppMessage)
     .eq("external_message_id", message.id)
     .maybeSingle();
   if (alreadyProcessed) return;
+
+  // DEV-48: a swipe-reply to a Capture-sent escalation/handler-notification
+  // alert routes back to the ORIGINAL conversation as the replying team
+  // member's real answer, instead of being treated as an ordinary new
+  // inbound message from an unrecognized number (the real bug this closes
+  // — see whatsapp-reply-routing.ts's own top-of-file note for the incident
+  // that surfaced it). Checked before findOrCreateConversationForInboundMessage
+  // so a routed reply never creates a stray customer/conversation at all.
+  const route = await resolveWhatsAppReplyRoute(connection.businessId, message.context?.id, message.from);
+  if (route) {
+    const assignedTo = await resolveHandlerEmailByWhatsAppNumber(connection.businessId, message.from);
+    if (assignedTo) {
+      // A team member replying is, in effect, taking the conversation —
+      // matches what clicking "Take Conversation" in the dashboard does, so
+      // the AI stays suppressed on it going forward and the dashboard shows
+      // who's handling it, exactly as if they'd used the UI.
+      await takeConversation(supabase, route.conversationId, assignedTo);
+    } else {
+      console.error("WhatsApp reply route matched but sender's number isn't on any business_members row", {
+        businessId: connection.businessId,
+        conversationId: route.conversationId,
+      });
+    }
+    await sendHumanReply(connection.businessId, route.conversationId, message.text.body, message.id);
+    return;
+  }
 
   const contact = value.contacts?.find((c) => c.wa_id === message.from);
   const { conversationId } = await findOrCreateConversationForInboundMessage(

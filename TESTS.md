@@ -1073,3 +1073,18 @@ Founder follow-up in the same conversation as `DEV-46`: asked for an explicit "r
 | 2026-09-14 | Cleanup | — | — | Temporary debug route (`api/debug/test-handler-whatsapp`) deleted immediately after the one send it existed for; `git status` confirmed it was never committed, no trace left in the repo. |
 | 2026-09-14 | `next build` (post-cleanup) | build | Pass | Re-ran clean after the debug route's removal, confirming nothing else depended on it. |
 | 2026-09-14 | Deploy | — | — | `vercel --prod`: `dpl_8J51cn2q5MDRnCr4A1eBMxoyhFM5`. |
+
+## Cross-Channel WhatsApp Reply Threading + Data Fixes (DEV-48)
+
+A real live test in `DEV-47` surfaced a real bug: the founder's own WhatsApp reply to an escalation alert got treated as a new customer message and auto-answered by the AI, never reaching the original Instagram customer. Root-caused against real production data (found the exact stray customer/conversation/messages it created) before building the fix.
+
+| Date | Test | Type | Result | Notes |
+|---|---|---|---|---|
+| 2026-09-14 | Queried real production data for the exact incident (`customers.external_customer_id like '%7037123201%'`, then its conversation and messages) | integration (real infra, root cause) | Confirmed | Found the stray "Casmir 👑" customer, its `whatsapp` conversation escalated on "Okay" (tier D, unclear message), and a real AI reply re-quoting the stale "Engage Basic"/"Engage Standard" names in response to the founder's own correction attempt. |
+| 2026-09-14 | `tsc --noEmit` / `next build` | build | Pass | Clean after the new `whatsapp_reply_routes` table, `whatsapp-reply-routing.ts`, `sendTemplateMessage`'s new return type, the webhook route's new routing branch, and `sendHumanReply`'s new optional param. |
+| 2026-09-14 | `whatsapp_reply_routes` insert + the exact `resolveWhatsAppReplyRoute`/`resolveHandlerEmailByWhatsAppNumber` select shapes, run against the real linked Supabase project using Capture's own real business/conversation ids and real `business_members` row, inside a rolled-back transaction | integration (real infra) | Pass | No error on insert or either select; correct read-back (`whatsapp_number "+2348000000001"` reverse-resolves via the same query the webhook route will run). Nothing persisted. |
+| 2026-09-14 | Cleanup: stray "Casmir 👑" customer/conversation/5 messages deleted from production | — | — | Confirmed zero rows remain via a follow-up count query on all three ids. |
+| 2026-09-14 | Data fix: both stale `knowledge_items` rows updated (`Engage Basic` → `Engage Starter`, `Engage Standard` → `Engage Growth`), scoped to Capture's own `business_id` only | integration (real infra) | Pass | Read back post-update: both rows now read correctly. Full-codebase grep for hardcoded "Basic"/"Standard" plan-name strings found none — `plans.display_name` (already "Starter"/"Growth") was the only place that needed no code change. |
+| 2026-09-14 | Deploy | — | — | Pending — see chat. |
+
+**Honestly scoped, not fully live-fire verified**: no real end-to-end test (real notification send → simulated real swipe-reply → real dispatch to the original Instagram conversation) was run this session — offered to the founder rather than assumed, since it would fire another real WhatsApp message and a real Instagram DM as a side effect.

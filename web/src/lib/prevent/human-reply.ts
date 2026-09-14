@@ -29,6 +29,15 @@ export async function sendHumanReply(
   businessId: string,
   conversationId: string,
   text: string,
+  // Added 2026-09-14 (DEV-48): set only by the WhatsApp webhook's
+  // cross-channel reply routing, to the inbound Meta message id that
+  // triggered this reply. Stored on the logged message so a redelivered
+  // webhook event (Meta's delivery is at-least-once) is caught by the exact
+  // same external_message_id idempotency check the webhook already runs
+  // before ever reaching this function — without it, a retry would
+  // re-trigger a second real send to the customer. Every other caller
+  // (the dashboard's own reply box) has no such id and omits this.
+  externalMessageId?: string,
 ): Promise<HumanReplyResult> {
   const trimmed = text.trim();
   if (!trimmed) return { ok: false, message: "Message can't be empty." };
@@ -118,6 +127,7 @@ export async function sendHumanReply(
     conversation_id: conversationId,
     sender_type: "business",
     body: trimmed,
+    external_message_id: externalMessageId ?? null,
     sent_at: sentAt,
   });
   await supabase.from("conversations").update({ last_message_at: sentAt }).eq("id", conversationId);

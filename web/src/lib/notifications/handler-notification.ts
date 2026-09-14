@@ -4,6 +4,7 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { decryptToken } from "@/lib/channels/token-crypto";
 import { sendTemplateMessage } from "@/lib/channels/whatsapp-api";
 import { HANDLER_REMINDER_MINUTES } from "@/lib/prevent/timers";
+import { recordWhatsAppReplyRoute } from "@/lib/notifications/whatsapp-reply-routing";
 
 // Founder request 2026-09-14: a customer replying to a conversation a human
 // account handler already owns (state = 'human_handling') must never be
@@ -41,6 +42,11 @@ function getResend(): Resend | null {
 
 export type HandlerNotification = {
   businessId: string;
+  // Added 2026-09-14 (DEV-48): lets the WhatsApp leg record a
+  // whatsapp_reply_routes row, so the handler's swipe-reply to this exact
+  // alert routes back to this conversation instead of becoming a new,
+  // unrelated inbound message.
+  conversationId: string;
   // conversations.assigned_to — an email address (see markTakeConversation
   // in components/engage/actions.ts), not a business_members row id.
   assignedTo: string;
@@ -135,7 +141,10 @@ export async function notifyHandlerWhatsApp(n: HandlerNotification): Promise<voi
     const snippet = n.messageBody.length > MAX_MESSAGE_SNIPPET_LENGTH ? n.messageBody.slice(0, MAX_MESSAGE_SNIPPET_LENGTH - 1) + "…" : n.messageBody;
     const params = [n.customerName ?? "A customer", CHANNEL_LABEL[n.channel] ?? n.channel, snippet, n.conversationUrl];
 
-    await sendTemplateMessage(accessToken, connection.external_account_id, phone, TEMPLATE_NAME, TEMPLATE_LANGUAGE, params);
+    const whatsappMessageId = await sendTemplateMessage(accessToken, connection.external_account_id, phone, TEMPLATE_NAME, TEMPLATE_LANGUAGE, params);
+    if (whatsappMessageId) {
+      await recordWhatsAppReplyRoute({ businessId: n.businessId, conversationId: n.conversationId, whatsappMessageId, recipientWaId: phone });
+    }
   } catch (err) {
     console.error("Handler WhatsApp notification threw unexpectedly", { businessId: n.businessId, err });
   }

@@ -223,6 +223,7 @@ async function processConversationMessage(
           : { data: null };
         await notifyHandler({
           businessId,
+          conversationId,
           assignedTo: conv.assigned_to,
           customerName: (customer?.name as string | null) ?? null,
           channel: conv.channel as string,
@@ -406,6 +407,7 @@ async function processConversationMessage(
     // has to be a template send, not plain text.
     await sendEscalationWhatsApp({
       businessId,
+      conversationId,
       customerName: (customer?.name as string | null) ?? null,
       channel: (conv?.channel as string | null) ?? "other",
       messageBody,
@@ -487,6 +489,7 @@ export async function sendHandlerReminder(supabase: SupabaseClient, businessId: 
 
   await notifyHandler({
     businessId,
+    conversationId,
     assignedTo: conv.assigned_to,
     customerName: (customer?.name as string | null) ?? null,
     channel: conv.channel as string,

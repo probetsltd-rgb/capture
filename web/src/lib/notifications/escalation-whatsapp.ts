@@ -2,6 +2,7 @@ import "server-only";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { decryptToken } from "@/lib/channels/token-crypto";
 import { sendTemplateMessage } from "@/lib/channels/whatsapp-api";
+import { recordWhatsAppReplyRoute } from "@/lib/notifications/whatsapp-reply-routing";
 
 // Founder request 2026-09-08 — the settings page has promised this since
 // 2026-09-02 ("Add your WhatsApp number so escalation alerts can reach you
@@ -51,6 +52,11 @@ async function getBusinessRecipientPhones(businessId: string, recipientLimit: nu
 
 export type EscalationWhatsAppNotification = {
   businessId: string;
+  // Added 2026-09-14 (DEV-48): lets each per-recipient send record a
+  // whatsapp_reply_routes row, so a team member's swipe-reply to this exact
+  // alert routes back to this conversation instead of becoming a new,
+  // unrelated inbound message.
+  conversationId: string;
   customerName: string | null;
   channel: string;
   messageBody: string;
@@ -94,7 +100,22 @@ export async function sendEscalationWhatsApp(notification: EscalationWhatsAppNot
 
     for (const phone of phones) {
       try {
-        await sendTemplateMessage(accessToken, connection.external_account_id, phone, TEMPLATE_NAME, TEMPLATE_LANGUAGE, params);
+        const whatsappMessageId = await sendTemplateMessage(
+          accessToken,
+          connection.external_account_id,
+          phone,
+          TEMPLATE_NAME,
+          TEMPLATE_LANGUAGE,
+          params,
+        );
+        if (whatsappMessageId) {
+          await recordWhatsAppReplyRoute({
+            businessId: notification.businessId,
+            conversationId: notification.conversationId,
+            whatsappMessageId,
+            recipientWaId: phone,
+          });
+        }
       } catch (err) {
         // One recipient's failure (e.g. a malformed number) must not stop
         // the rest — same per-recipient isolation as every other loop in

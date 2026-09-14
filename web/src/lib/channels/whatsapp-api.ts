@@ -189,6 +189,14 @@ export async function sendMediaMessage(
 // ratio exceeds limit" for too few fixed words around 4 variables, then
 // "Leading or trailing params not allowed" for ending on a variable —
 // both real, documented Meta template-content rules, not guessed at).
+// Return type added 2026-09-14 (DEV-48, cross-channel reply threading): the
+// wamid Meta hands back is the only handle available later to recognize a
+// recipient's WhatsApp "swipe to reply" quote of this exact message — see
+// whatsapp_reply_routes / lib/notifications/whatsapp-reply-routing.ts.
+// `null` on a real send failure is unreachable (the throw below fires
+// first) — it only covers a response shape genuinely missing `messages[0]`,
+// which would mean Meta accepted the send but this code can't correlate a
+// reply to it; callers must treat that as "no id available," not an error.
 export async function sendTemplateMessage(
   accessToken: string,
   phoneNumberId: string,
@@ -196,7 +204,7 @@ export async function sendTemplateMessage(
   templateName: string,
   languageCode: string,
   bodyParameters: string[],
-): Promise<void> {
+): Promise<string | null> {
   const response = await fetch(`${GRAPH_BASE}/${phoneNumberId}/messages`, {
     method: "POST",
     headers: {
@@ -223,6 +231,8 @@ export async function sendTemplateMessage(
   if (!response.ok) {
     throw new Error(`WhatsApp template send failed: ${response.status} ${await response.text()}`);
   }
+  const result = (await response.json()) as { messages?: { id?: string }[] };
+  return result.messages?.[0]?.id ?? null;
 }
 
 export type TemplateCategory = "utility" | "marketing" | "authentication";
