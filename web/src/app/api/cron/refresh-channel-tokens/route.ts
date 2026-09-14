@@ -16,7 +16,7 @@ import { refreshBusinessToken } from "@/lib/channels/whatsapp-api";
 // WhatsApp: grant_type=fb_exchange_token with
 // set_token_expires_in_60_days=true, no minimum-age constraint documented).
 // Runs daily (well within Vercel Hobby's once-a-day ceiling — unlike
-// escalation-timers/resume-after-silence, this isn't blocked by DEP-10),
+// escalation-timers/handler-reminders, this isn't blocked by DEP-10),
 // refreshing anything within 7 days of expiry so a slow day or a transient
 // failure still leaves days of runway before an actual outage.
 const REFRESH_WINDOW_DAYS = 7;

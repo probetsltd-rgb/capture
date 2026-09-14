@@ -1,0 +1,19 @@
+-- Founder request 2026-09-14, in chat: a customer replying to a conversation
+-- a human account handler already owns (state = 'human_handling') should
+-- never be silently handed back to the AI — full conversation context
+-- (what the handler actually said, off-script from approved knowledge) may
+-- not be something the AI can safely pick back up. This supersedes DEV-42's
+-- 2026-09-08 resume-after-silence behavior: instead of un-claiming the
+-- conversation and replaying the message through the AI after
+-- HANDLER_REMINDER_MINUTES of team silence, Engage now pings the assigned
+-- handler the moment the customer's reply lands, then reminds them once
+-- more if they're still quiet — but never resumes automated replies.
+--
+-- handler_reminder_sent_at marks whether that one reminder has already
+-- fired for the *current* unanswered customer message, so the reminder
+-- cron (lib/prevent/timers.ts computeConversationsNeedingReminder) doesn't
+-- re-notify on every pass. Reset to null whenever a new customer message
+-- arrives on a human_handling conversation (lib/prevent/process.ts), so a
+-- later message starts its own fresh reminder cycle rather than being
+-- silently skipped by a stale timestamp from an earlier one.
+alter table conversations add column handler_reminder_sent_at timestamptz;

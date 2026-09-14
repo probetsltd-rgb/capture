@@ -29,7 +29,7 @@ export const HOME_FAQS: FaqItem[] = [
   {
     question: "Can I take over a conversation myself?",
     answer:
-      "Yes, any time. Taking over immediately stops automated replies, and you can reply to the customer directly from your Capture dashboard — no need to switch over to Instagram itself. If your team goes quiet on a customer's message for more than 10 minutes, Engage resumes rather than leaving them unanswered, always with a visible note in the conversation — your team can take it back at any point.",
+      "Yes, any time. Taking over immediately and permanently stops automated replies on that conversation, and you can reply to the customer directly from your Capture dashboard — no need to switch over to Instagram itself. If a customer replies while you're still handling it, we'll notify you right away, plus a reminder if you haven't gotten back to them after 10 minutes — Engage won't jump back in on its own, since it can't see what you've already told them.",
   },
   {
     question: "How do escalations reach my team?",

@@ -68,11 +68,12 @@ export default function PrivacyPage() {
             knowledge base — never general knowledge, never a guess. Anything it isn&apos;t confident is
             fully covered by your approved knowledge, or that needs judgement (price negotiation, a
             complaint, an unusual request), is routed to your team instead of answered automatically. You
-            can take over any conversation at any time, which immediately stops automated replies on that
-            conversation. If your team goes quiet on a customer&apos;s message for more than 10 minutes,
-            Engage resumes rather than leaving it unanswered — always visibly noted in the conversation, and
-            your team can take it back over at any point. Engage does not autonomously negotiate, issue
-            refunds, process payments, or make bookings.
+            can take over any conversation at any time, which immediately and permanently stops automated
+            replies on that conversation. If a customer replies while your team is handling it, the assigned
+            team member is notified right away, with a reminder after 10 minutes of no response — Engage
+            never resumes automated replies on its own, since it has no way to know what your team already
+            told the customer. Engage does not autonomously negotiate, issue refunds, process payments, or
+            make bookings.
           </p>
 
           <h2>Data we collect, and why</h2>

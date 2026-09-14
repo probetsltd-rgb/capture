@@ -53,37 +53,46 @@ export function computeDueTimerActions(
   return actions;
 }
 
-// Founder decision 2026-09-07: after a team takes a conversation
-// (human_handling), if the customer's most recent message has gone this
-// many minutes without a team reply, Engage resumes rather than leaving it
-// stuck on a team member who's gone quiet. Matches the existing T+10
-// reminder threshold above rather than inventing a separate number — see
-// lib/prevent/process.ts's resumeSilentConversation for the actual resume,
-// and api/cron/resume-after-silence for what calls this.
-export const RESUME_AFTER_SILENCE_MINUTES = 10;
+// Founder decision 2026-09-14: supersedes the 2026-09-07 "resume after
+// silence" behavior below (formerly RESUME_AFTER_SILENCE_MINUTES /
+// computeConversationsToResume / resumeSilentConversation). Handing an
+// unanswered conversation back to the AI turned out to be the wrong default
+// once a human has actually taken it — the AI has no way to know what the
+// handler already said off-script, so "safe incompleteness" (this file's
+// own guiding principle elsewhere in Prevent) means staying off, not
+// guessing back in. Same 10-minute threshold carried forward (it was never
+// about the number, just what happens at it) — see
+// lib/notifications/handler-notification.ts for the actual reminder send,
+// and api/cron/handler-reminders for what calls this.
+export const HANDLER_REMINDER_MINUTES = 10;
 
-export type ConversationForResume = {
+export type ConversationForReminder = {
   id: string;
   latestMessageSenderType: string | null;
   latestMessageSentAt: string | null;
+  handlerReminderSentAt: string | null;
 };
 
 /**
  * Given human_handling conversations paired with their latest message,
- * return the ids whose latest message is from the customer and has sat
- * unanswered for RESUME_AFTER_SILENCE_MINUTES+. Pure so the threshold is
- * testable without a live cron trigger, same reasoning as
- * computeDueTimerActions above.
+ * return the ids whose latest message is from the customer, has sat
+ * unanswered for HANDLER_REMINDER_MINUTES+, and haven't already had a
+ * reminder sent for this specific unanswered message (handlerReminderSentAt
+ * is reset to null whenever a fresh customer message arrives — see
+ * process.ts's isHumanActive branch — so an earlier reminder never suppresses
+ * a later, genuinely new one). Pure so the threshold is testable without a
+ * live cron trigger, same reasoning as computeDueTimerActions above.
  */
-export function computeConversationsToResume(
-  conversations: ConversationForResume[],
+export function computeConversationsNeedingReminder(
+  conversations: ConversationForReminder[],
   now: Date = new Date(),
 ): string[] {
   const ids: string[] = [];
   for (const conv of conversations) {
     if (conv.latestMessageSenderType !== "customer" || !conv.latestMessageSentAt) continue;
+    if (conv.handlerReminderSentAt) continue;
     const minutesSinceLastMessage = (now.getTime() - new Date(conv.latestMessageSentAt).getTime()) / 60000;
-    if (minutesSinceLastMessage >= RESUME_AFTER_SILENCE_MINUTES) ids.push(conv.id);
+    if (minutesSinceLastMessage >= HANDLER_REMINDER_MINUTES) ids.push(conv.id);
   }
   return ids;
 }

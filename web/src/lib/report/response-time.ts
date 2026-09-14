@@ -38,9 +38,12 @@ export function computeResponseTimeStats(messages: MessageForResponseTime[]): Re
     const firstCustomerTime = new Date(firstCustomerMessage.sent_at).getTime();
 
     // First actual reply after that message — "ai" or "business", never
-    // "system" (that's the resume-after-silence marker, not a reply to the
-    // customer) — whichever comes first, matching how a customer
-    // experiences response time regardless of who or what answered.
+    // "system" (historically the resume-after-silence marker; DEV-46
+    // removed that code path 2026-09-14, but old rows using it still exist
+    // — this exclusion still matters for them, and costs nothing to keep
+    // even once none remain) — whichever comes first, matching how a
+    // customer experiences response time regardless of who or what
+    // answered.
     const firstReply = sorted.find(
       (m) =>
         (m.sender_type === "ai" || m.sender_type === "business") &&
