@@ -11,15 +11,29 @@ import { createClient } from "@/lib/supabase/client";
 // flash of the signed-out state before this resolves is an acceptable
 // tradeoff for not needing every page that renders these to pass auth state
 // through explicitly.
+//
+// Founder-caught 2026-09-14 (screenshot: the marketing nav read "Dashboard"
+// on /signup while the founder believed they were signed out): this used
+// `getSession()`, which only reads whatever's cached in local storage and
+// never validates it against the server — the one place in this whole
+// codebase still doing that (every other auth check, including the real
+// gate on /dashboard itself and middleware.ts, uses `getClaims()`, which
+// does verify). A stale or since-revoked local session was enough to flip
+// this label to "Dashboard" even though the actual protected page would
+// have correctly redirected to /login — a misleading label, not a real
+// bypass, but worth closing the gap to match the one auth-check convention
+// this project otherwise uses everywhere.
 function useSignedIn(): boolean {
   const [signedIn, setSignedIn] = useState(false);
 
   useEffect(() => {
     const supabase = createClient();
-    supabase.auth.getSession().then(({ data }) => setSignedIn(!!data.session));
+    supabase.auth.getClaims().then(({ data }) => setSignedIn(!!data?.claims));
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => setSignedIn(!!session));
+    } = supabase.auth.onAuthStateChange(() => {
+      supabase.auth.getClaims().then(({ data }) => setSignedIn(!!data?.claims));
+    });
     return () => subscription.unsubscribe();
   }, []);
 

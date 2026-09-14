@@ -1104,3 +1104,16 @@ Founder asked to run the live-fire test `DEV-48` had deliberately held back.
 | 2026-09-14 | `next build` (post-cleanup) | build | Pass | Clean. |
 
 **Scope note**: the real Instagram DM dispatch (`sendHumanReply`'s `sendMessage` call to Meta's Instagram API) ran for real as part of this test and threw no error — not independently re-confirmed by re-fetching Instagram's own side of the conversation, same reasoning `DEV-47`'s WhatsApp send used.
+
+## Marketing Nav Stale-Session Label Fix (DEV-50)
+
+Founder screenshot: `/signup`'s nav read "Dashboard" while believing they were signed out; also asked to confirm the dashboard has a working sign-out button.
+
+| Date | Test | Type | Result | Notes |
+|---|---|---|---|---|
+| 2026-09-14 | Read `dashboard/page.tsx` and `AppNav.tsx`/`dashboard/layout.tsx` directly | code review | Confirmed correct | `/dashboard` already gates via `getClaims()` (network-validated) and redirects unauthenticated visitors to `/login`; `AppNav` (rendered on every dashboard/admin/onboarding page) already has a real "Sign out" button calling `supabase.auth.signOut()`. Neither needed a fix. |
+| 2026-09-14 | `next build` after switching `SiteChrome.tsx`'s `useSignedIn()` from `getSession()` to `getClaims()` | build | Pass | Clean. |
+| 2026-09-14 | Real browser test, local dev server: baseline with no session present | e2e (real infra) | Pass | Nav correctly showed "Sign in" / "Try Free". |
+| 2026-09-14 | Real browser test: injected a forged session object directly into `localStorage` (`sb-vtxvogszynhhmyizcvwq-auth-token`) — valid JSON shape, `expires_at` an hour in the future (so no local-expiry refresh would trigger), garbage/invalid `access_token` — then reloaded | e2e (real infra, real reproduction of the reported condition) | Pass | Nav correctly still showed "Sign in" — the exact condition under which the old `getSession()`-based code would have shown "Dashboard" (per Supabase's own documented behavior: `getSession()` reads local storage and never validates the JWT). No console error. |
+| 2026-09-14 | Cleanup: forged token removed from `localStorage`, tab closed, dev server killed by exact PID | — | — | Confirmed process no longer running. |
+| 2026-09-14 | `next build` (post-cleanup) | build | Pass | Clean. |
