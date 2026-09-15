@@ -1156,3 +1156,4 @@ Founder: WhatsApp escalations should send from Capture's own number, not require
 | 2026-09-15 | `next build` (final) | build | Pass | Clean. |
 
 **Not live-fire tested this round**: unlike `DEV-47`/`DEV-49`, no real WhatsApp send was fired to confirm this end-to-end — the underlying send mechanism (Capture's own connection, `sendTemplateMessage`) was already proven live in those two, and firing another real message needs its own fresh ask rather than being assumed from an earlier grant (see `feedback-testing-rigor` memory). Offered to the founder, not yet run.
+| 2026-09-15 | Deploy | — | — | `vercel --prod`: `dpl_E3TmGykSasLpWUmVcomJNknfBtwD`. |
