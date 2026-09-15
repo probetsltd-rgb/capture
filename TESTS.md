@@ -1169,3 +1169,16 @@ Founder: "there's a user, ravefashionafrica, you can use the escalation number f
 | 2026-09-15 | DB confirmation: `whatsapp_reply_routes` for that conversation | integration (real infra) | Pass | Real wamid recorded, `recipient_wa_id` normalizes to exactly `2348000000002` — the owner's real saved number. Direct proof the alert reached a real phone via Capture's own connection, for a business with no WhatsApp connection of its own. |
 | 2026-09-15 | Cleanup: debug route deleted, dev server killed by exact PID | — | — | `git status` confirmed no trace. |
 | 2026-09-15 | `next build` (post-cleanup) | build | Pass | Clean. |
+
+## Escalation WhatsApp Template Reformatted With Line Breaks (DEV-55)
+
+Founder, after the DEV-54 test message arrived: wanted line breaks so the message doesn't read as one dense block of text.
+
+| Date | Test | Type | Result | Notes |
+|---|---|---|---|---|
+| 2026-09-15 | Submitted `escalation_alert_v2` (line breaks between fields, same 4 params/order) via `createMessageTemplate`, through a temporary debug route against Capture's own WABA | integration (real infra, real Meta submission) | Accepted, `PENDING` | No structural rejection at submission — the two known failure modes from the original template's own design (leading/trailing param, words-ratio) were avoided deliberately (body ends on plain text, not `{{4}}`; 19 fixed words to 4 variables). |
+| 2026-09-15 | Polled Meta's real template-review status | integration (real infra) | Approved | First at 30s intervals (a shell `status` read-only-variable bug caught and fixed immediately), then a slower 5-minute interval after the dev server it depended on died mid-poll (also caught and recovered — restarted the server, resumed polling, made the poll loop tolerant of transient check failures). Approved same session — faster than the original template's own "same day" turnaround. |
+| 2026-09-15 | `next build` after switching `TEMPLATE_NAME` in both `escalation-whatsapp.ts` and `handler-notification.ts` to `escalation_alert_v2` | build | Pass | Clean. |
+| 2026-09-15 | Real re-send: re-fired the exact same `DEV-54` test (Rave Fashion, same conversation) with the new template live | integration (real infra, real recipient) | Pass | A new real wamid returned and recorded in `whatsapp_reply_routes` against the same real recipient number — confirms the reformatted message actually sent successfully, not just that the template was approved. |
+| 2026-09-15 | Cleanup: both debug routes deleted, dev server killed by exact PID | — | — | `git status` confirmed no trace. |
+| 2026-09-15 | `next build` (post-cleanup) | build | Pass | Clean. |

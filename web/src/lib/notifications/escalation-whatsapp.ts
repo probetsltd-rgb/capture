@@ -24,7 +24,12 @@ import { recordWhatsAppReplyRoute } from "@/lib/notifications/whatsapp-reply-rou
 // business connects for customer ingestion/channel purposes" (still
 // per-business, unchanged, same as Instagram) from "the number Capture
 // itself notifies from" (one shared platform number, for every business).
-const TEMPLATE_NAME = "escalation_alert";
+// Founder request 2026-09-15: reads as one dense paragraph on a phone
+// screen — replaced with escalation_alert_v2 (line breaks between fields:
+// customer, channel, quoted message, link), approved by Meta the same
+// day. escalation_alert itself is left in place, unreferenced — templates
+// can't be deleted via the API once approved, and there's no reason to.
+const TEMPLATE_NAME = "escalation_alert_v2";
 const TEMPLATE_LANGUAGE = "en_US";
 const MAX_MESSAGE_SNIPPET_LENGTH = 150;
 const NOTIFICATION_BUSINESS_ID = process.env.WHATSAPP_NOTIFICATION_BUSINESS_ID;

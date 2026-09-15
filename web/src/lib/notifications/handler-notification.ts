@@ -24,7 +24,10 @@ const FROM_ADDRESS = "Capture Alerts <escalations@mail.capture.com.ng>";
 // its four params (who, channel, snippet, link) already say "a conversation
 // needs you," which reads correctly for both a fresh reply and a reminder;
 // only the email copy below actually differs by `kind`.
-const TEMPLATE_NAME = "escalation_alert";
+// Founder request 2026-09-15: same reformatting as escalation-whatsapp.ts's
+// own note — escalation_alert_v2 replaces escalation_alert with line
+// breaks between fields, approved by Meta the same day.
+const TEMPLATE_NAME = "escalation_alert_v2";
 const TEMPLATE_LANGUAGE = "en_US";
 const MAX_MESSAGE_SNIPPET_LENGTH = 150;
 
