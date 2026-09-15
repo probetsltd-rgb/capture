@@ -31,7 +31,7 @@ export function NotificationPhoneForm({
           className="input"
         />
         <span className="field__hint">
-          Where escalation alerts will reach you once WhatsApp notifications are live. International format,
+          Where escalation alerts will reach you on WhatsApp, alongside email. International format,
           e.g. +2348012345678. Leave blank to remove.
         </span>
       </label>

@@ -1143,3 +1143,16 @@ Founder: when a conversation is released back to AI, it should read the prior co
 | 2026-09-14 | Cleanup: both temporary debug routes deleted, local dev server killed by exact PID each time | — | — | `git status` confirmed neither route was ever committed. |
 | 2026-09-14 | `next build` (post-cleanup) | build | Pass | Clean. |
 | 2026-09-14 | Deploy | — | — | `vercel --prod`: `dpl_Z3JNf3FZEeAPyKGS9xGCjiQj897S`. |
+
+## WhatsApp Escalations From Capture's Own Number (DEV-53)
+
+Founder: WhatsApp escalations should send from Capture's own number, not require each business to connect their own — a business's own connection stays for customer ingestion/channel purposes only.
+
+| Date | Test | Type | Result | Notes |
+|---|---|---|---|---|
+| 2026-09-15 | `next build` after adding `WHATSAPP_NOTIFICATION_BUSINESS_ID`, updating `escalation-whatsapp.ts`/`handler-notification.ts`'s connection lookup, `resolveWhatsAppReplyRoute`'s new signature, and the webhook route's use of `route.businessId` | build | Pass | Clean. |
+| 2026-09-15 | Real query: does a `SIMULATED` business (never connected WhatsApp) have zero `channel_connections` rows, while `WHATSAPP_NOTIFICATION_BUSINESS_ID` (Capture's own) has a real one with a token? | integration (real infra) | Pass | `SIMULATED` business: `0` WhatsApp connections. Capture's own: real connection, `has_token: true`. Proves the new connection lookup (scoped to `WHATSAPP_NOTIFICATION_BUSINESS_ID`) no longer depends on the escalating business having connected anything. |
+| 2026-09-15 | Real query, rolled-back transaction: inserted a `whatsapp_reply_routes` row tagged to that same zero-connection `SIMULATED` business, then ran the exact new business-id-less `resolveWhatsAppReplyRoute` query | integration (real infra) | Pass | Correctly returned the `SIMULATED` business's own real id from the row — not Capture's own id, even though Capture's number is what any real notification would have sent from. This is the exact property cross-channel reply-threading needs to keep working under a shared sending number. Nothing persisted (`rollback`). |
+| 2026-09-15 | `next build` (final) | build | Pass | Clean. |
+
+**Not live-fire tested this round**: unlike `DEV-47`/`DEV-49`, no real WhatsApp send was fired to confirm this end-to-end — the underlying send mechanism (Capture's own connection, `sendTemplateMessage`) was already proven live in those two, and firing another real message needs its own fresh ask rather than being assumed from an earlier grant (see `feedback-testing-rigor` memory). Offered to the founder, not yet run.

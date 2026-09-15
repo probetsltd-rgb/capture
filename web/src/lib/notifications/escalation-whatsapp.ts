@@ -9,14 +9,25 @@ import { recordWhatsAppReplyRoute } from "@/lib/notifications/whatsapp-reply-rou
 // there in future — email works today"); this is "in future" arriving.
 // Additive alongside email (`escalation-email.ts`), never a replacement —
 // a member with no WhatsApp number set just doesn't get this one, they
-// still get email. Uses the real, Meta-approved-pending `escalation_alert`
-// template (id 1616066190242207, submitted same day) since a team
-// member's phone has essentially never messaged Capture's business
-// number, so this is a business-initiated send outside any 24h session
-// window — plain text would be rejected.
+// still get email. Uses the real, Meta-approved `escalation_alert`
+// template (id 1616066190242207) since a team member's phone has
+// essentially never messaged Capture's business number, so this is a
+// business-initiated send outside any 24h session window — plain text
+// would be rejected.
+//
+// Founder request 2026-09-15: sent from Capture's OWN connected WhatsApp
+// number (WHATSAPP_NOTIFICATION_BUSINESS_ID, a real business_id — see
+// `channel_connections` lookup below), never from the escalating
+// business's own number. Before this, a business that had never connected
+// their own WhatsApp got no WhatsApp alerts at all, even with a team
+// member's notification number saved — this decouples "the number a
+// business connects for customer ingestion/channel purposes" (still
+// per-business, unchanged, same as Instagram) from "the number Capture
+// itself notifies from" (one shared platform number, for every business).
 const TEMPLATE_NAME = "escalation_alert";
 const TEMPLATE_LANGUAGE = "en_US";
 const MAX_MESSAGE_SNIPPET_LENGTH = 150;
+const NOTIFICATION_BUSINESS_ID = process.env.WHATSAPP_NOTIFICATION_BUSINESS_ID;
 
 const CHANNEL_LABEL: Record<string, string> = {
   instagram: "Instagram",
@@ -67,21 +78,26 @@ export type EscalationWhatsAppNotification = {
 // Deliberately never throws — same discipline as sendEscalationNotification
 // (the conversation is already correctly marked human_required by the time
 // this runs; this is a courtesy notification on top of that real
-// guarantee, not part of it). Silently does nothing if the business has no
-// active WhatsApp connection (nothing to send *from*) or no member has set
-// a WhatsApp number (nothing to send *to*) — neither is an error, both are
-// just "this channel isn't set up for this business yet."
+// guarantee, not part of it). Silently does nothing if Capture's own
+// platform WhatsApp connection isn't set up (nothing to send *from* — a
+// deploy-config issue, not per-business) or no member of the escalating
+// business has set a WhatsApp number (nothing to send *to*) — neither is
+// an error.
 export async function sendEscalationWhatsApp(notification: EscalationWhatsAppNotification): Promise<void> {
   try {
+    if (!NOTIFICATION_BUSINESS_ID) {
+      console.error("WhatsApp escalation skipped: WHATSAPP_NOTIFICATION_BUSINESS_ID is not set");
+      return;
+    }
     const supabase = createServiceRoleClient();
     const { data: connection } = await supabase
       .from("channel_connections")
       .select("access_token_encrypted, external_account_id")
-      .eq("business_id", notification.businessId)
+      .eq("business_id", NOTIFICATION_BUSINESS_ID)
       .eq("channel", "whatsapp")
       .is("disconnected_at", null)
       .maybeSingle();
-    if (!connection) return; // no WhatsApp connected — email is the only channel for this business today
+    if (!connection) return; // Capture's own platform WhatsApp number isn't connected — email still goes out regardless
 
     const phones = await getBusinessRecipientPhones(notification.businessId, notification.recipientLimit);
     if (phones.length === 0) return; // no team member has set a notification number yet

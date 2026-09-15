@@ -54,13 +54,25 @@ export async function recordWhatsAppReplyRoute(params: {
   }
 }
 
-export type ResolvedReplyRoute = { conversationId: string };
+export type ResolvedReplyRoute = { businessId: string; conversationId: string };
 
 // `contextMessageId` is `messages[].context.id` from the inbound webhook
 // payload — present only when the sender used WhatsApp's native swipe/quote
 // reply on a specific earlier message; absent for an ordinary typed
 // message, which correctly falls through to normal inbound handling (there
 // is no way to correlate that case, by design of the underlying mechanism).
+//
+// Founder request 2026-09-15: no longer takes a `businessId` to filter by —
+// since escalation/handler notifications now all send from Capture's own
+// shared WhatsApp number (WHATSAPP_NOTIFICATION_BUSINESS_ID, see
+// escalation-whatsapp.ts/handler-notification.ts), a swipe-reply to one
+// always arrives on THAT number regardless of which business it's actually
+// about, so `getConnectionByPhoneNumberId`'s resolved business in the
+// webhook route is no longer the right business to filter or act on. The
+// real business is instead read directly off the matched route row (it was
+// recorded correctly at send time, from the real escalating business) and
+// returned to the caller — resolving identity from the route, never from
+// which number the reply happened to land on.
 //
 // The recipient match below is load-bearing, not a tidiness check: without
 // it, anyone who somehow obtained a real wamid (e.g. a notification
@@ -70,7 +82,6 @@ export type ResolvedReplyRoute = { conversationId: string };
 // was sent to means a match only succeeds for someone who could plausibly
 // have received the real WhatsApp message and swiped to reply on it.
 export async function resolveWhatsAppReplyRoute(
-  businessId: string,
   contextMessageId: string | undefined,
   fromWaId: string,
 ): Promise<ResolvedReplyRoute | null> {
@@ -79,13 +90,12 @@ export async function resolveWhatsAppReplyRoute(
   const supabase = createServiceRoleClient();
   const { data: route } = await supabase
     .from("whatsapp_reply_routes")
-    .select("conversation_id, recipient_wa_id")
-    .eq("business_id", businessId)
+    .select("business_id, conversation_id, recipient_wa_id")
     .eq("whatsapp_message_id", contextMessageId)
     .maybeSingle();
   if (!route || route.recipient_wa_id !== normalizeWaId(fromWaId)) return null;
 
-  return { conversationId: route.conversation_id };
+  return { businessId: route.business_id, conversationId: route.conversation_id };
 }
 
 // Reverse of handler-notification.ts's own lookup (which goes email ->

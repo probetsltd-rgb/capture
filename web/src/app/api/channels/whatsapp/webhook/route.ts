@@ -132,14 +132,15 @@ async function processOneMessage(value: WhatsAppValue, message: WhatsAppMessage)
   const supabase = createServiceRoleClient();
 
   // Meta's webhook delivery is at-least-once — a redelivered event must
-  // not trigger a second AI reply. Same external_message_id-based
-  // idempotency check as the Instagram webhook.
-  const { data: alreadyProcessed } = await supabase
-    .from("messages")
-    .select("id")
-    .eq("business_id", connection.businessId)
-    .eq("external_message_id", message.id)
-    .maybeSingle();
+  // not trigger a second AI reply (or, on the routed-reply path below, a
+  // second real send to a customer). Global, not scoped to
+  // connection.businessId: a routed reply gets stored under the real
+  // escalating business's id (resolved from the route itself, per the
+  // note below), which since 2026-09-15 is no longer necessarily the same
+  // business that owns the number this event arrived on — external_message_id
+  // is a Meta-generated wamid, globally unique, so scoping this check by
+  // business was never actually necessary, just previously harmless.
+  const { data: alreadyProcessed } = await supabase.from("messages").select("id").eq("external_message_id", message.id).maybeSingle();
   if (alreadyProcessed) return;
 
   // DEV-48: a swipe-reply to a Capture-sent escalation/handler-notification
@@ -149,9 +150,18 @@ async function processOneMessage(value: WhatsAppValue, message: WhatsAppMessage)
   // — see whatsapp-reply-routing.ts's own top-of-file note for the incident
   // that surfaced it). Checked before findOrCreateConversationForInboundMessage
   // so a routed reply never creates a stray customer/conversation at all.
-  const route = await resolveWhatsAppReplyRoute(connection.businessId, message.context?.id, message.from);
+  //
+  // Since 2026-09-15, escalation/handler notifications all send from
+  // Capture's own shared WhatsApp number — a swipe-reply to one arrives on
+  // THAT number regardless of which business it's actually about, so
+  // `connection.businessId` (whoever owns the number this event arrived on)
+  // is no longer the right business for a routed reply. `resolveWhatsAppReplyRoute`
+  // resolves the real business directly from the route row instead — use
+  // `route.businessId` for everything below, never `connection.businessId`,
+  // within this branch.
+  const route = await resolveWhatsAppReplyRoute(message.context?.id, message.from);
   if (route) {
-    const assignedTo = await resolveHandlerEmailByWhatsAppNumber(connection.businessId, message.from);
+    const assignedTo = await resolveHandlerEmailByWhatsAppNumber(route.businessId, message.from);
     if (assignedTo) {
       // A team member replying is, in effect, taking the conversation —
       // matches what clicking "Take Conversation" in the dashboard does, so
@@ -160,11 +170,11 @@ async function processOneMessage(value: WhatsAppValue, message: WhatsAppMessage)
       await takeConversation(supabase, route.conversationId, assignedTo);
     } else {
       console.error("WhatsApp reply route matched but sender's number isn't on any business_members row", {
-        businessId: connection.businessId,
+        businessId: route.businessId,
         conversationId: route.conversationId,
       });
     }
-    await sendHumanReply(connection.businessId, route.conversationId, message.text.body, message.id);
+    await sendHumanReply(route.businessId, route.conversationId, message.text.body, message.id);
     return;
   }
 

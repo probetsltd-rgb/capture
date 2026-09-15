@@ -28,6 +28,11 @@ const TEMPLATE_NAME = "escalation_alert";
 const TEMPLATE_LANGUAGE = "en_US";
 const MAX_MESSAGE_SNIPPET_LENGTH = 150;
 
+// Founder request 2026-09-15: sent from Capture's OWN connected WhatsApp
+// number, not the escalating business's — see escalation-whatsapp.ts's own
+// note on this, same reasoning and same env var applies here.
+const NOTIFICATION_BUSINESS_ID = process.env.WHATSAPP_NOTIFICATION_BUSINESS_ID;
+
 const CHANNEL_LABEL: Record<string, string> = {
   instagram: "Instagram",
   whatsapp: "WhatsApp",
@@ -124,15 +129,19 @@ async function findAssignedHandlerWhatsAppNumber(businessId: string, assignedTo:
 
 export async function notifyHandlerWhatsApp(n: HandlerNotification): Promise<void> {
   try {
+    if (!NOTIFICATION_BUSINESS_ID) {
+      console.error("Handler WhatsApp notification skipped: WHATSAPP_NOTIFICATION_BUSINESS_ID is not set");
+      return;
+    }
     const supabase = createServiceRoleClient();
     const { data: connection } = await supabase
       .from("channel_connections")
       .select("access_token_encrypted, external_account_id")
-      .eq("business_id", n.businessId)
+      .eq("business_id", NOTIFICATION_BUSINESS_ID)
       .eq("channel", "whatsapp")
       .is("disconnected_at", null)
       .maybeSingle();
-    if (!connection) return; // no WhatsApp connected for this business — email is the only channel today
+    if (!connection) return; // Capture's own platform WhatsApp number isn't connected — email still goes out regardless
 
     const phone = await findAssignedHandlerWhatsAppNumber(n.businessId, n.assignedTo);
     if (!phone) return; // the assigned handler hasn't set a notification number
