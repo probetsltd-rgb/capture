@@ -1155,5 +1155,17 @@ Founder: WhatsApp escalations should send from Capture's own number, not require
 | 2026-09-15 | Real query, rolled-back transaction: inserted a `whatsapp_reply_routes` row tagged to that same zero-connection `SIMULATED` business, then ran the exact new business-id-less `resolveWhatsAppReplyRoute` query | integration (real infra) | Pass | Correctly returned the `SIMULATED` business's own real id from the row — not Capture's own id, even though Capture's number is what any real notification would have sent from. This is the exact property cross-channel reply-threading needs to keep working under a shared sending number. Nothing persisted (`rollback`). |
 | 2026-09-15 | `next build` (final) | build | Pass | Clean. |
 
-**Not live-fire tested this round**: unlike `DEV-47`/`DEV-49`, no real WhatsApp send was fired to confirm this end-to-end — the underlying send mechanism (Capture's own connection, `sendTemplateMessage`) was already proven live in those two, and firing another real message needs its own fresh ask rather than being assumed from an earlier grant (see `feedback-testing-rigor` memory). Offered to the founder, not yet run.
+**Not live-fire tested this round**: unlike `DEV-47`/`DEV-49`, no real WhatsApp send was fired to confirm this end-to-end — the underlying send mechanism (Capture's own connection, `sendTemplateMessage`) was already proven live in those two, and firing another real message needs its own fresh ask rather than being assumed from an earlier grant (see `feedback-testing-rigor` memory). Offered to the founder, not yet run. **Closed same day — see below.**
 | 2026-09-15 | Deploy | — | — | `vercel --prod`: `dpl_E3TmGykSasLpWUmVcomJNknfBtwD`. |
+
+## Live-Fire Confirmation Against a Real Business (DEV-54)
+
+Founder: "there's a user, ravefashionafrica, you can use the escalation number for an actual test."
+
+| Date | Test | Type | Result | Notes |
+|---|---|---|---|---|
+| 2026-09-15 | Found Rave Fashion (`0a729a53-…`) and confirmed its actual state | integration (real infra) | Confirmed ideal case | Real signup, Instagram connected, **zero WhatsApp connections of its own**, owner's real notification number already saved (`+2348000000002`) — exactly the scenario `DEV-53` exists for. |
+| 2026-09-15 | Real `sendEscalationWhatsApp` fired (temporary debug route, deleted after) against a real Rave Fashion conversation, carrying its real last customer message | integration (real infra, real recipient, founder-authorized) | Pass | `200 {"ok":true}`, ~4.5s of real application-code time (consistent with a real Meta Graph API round trip), no error logged. |
+| 2026-09-15 | DB confirmation: `whatsapp_reply_routes` for that conversation | integration (real infra) | Pass | Real wamid recorded, `recipient_wa_id` normalizes to exactly `2348000000002` — the owner's real saved number. Direct proof the alert reached a real phone via Capture's own connection, for a business with no WhatsApp connection of its own. |
+| 2026-09-15 | Cleanup: debug route deleted, dev server killed by exact PID | — | — | `git status` confirmed no trace. |
+| 2026-09-15 | `next build` (post-cleanup) | build | Pass | Clean. |
