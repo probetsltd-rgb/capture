@@ -1182,3 +1182,4 @@ Founder, after the DEV-54 test message arrived: wanted line breaks so the messag
 | 2026-09-15 | Real re-send: re-fired the exact same `DEV-54` test (Rave Fashion, same conversation) with the new template live | integration (real infra, real recipient) | Pass | A new real wamid returned and recorded in `whatsapp_reply_routes` against the same real recipient number — confirms the reformatted message actually sent successfully, not just that the template was approved. |
 | 2026-09-15 | Cleanup: both debug routes deleted, dev server killed by exact PID | — | — | `git status` confirmed no trace. |
 | 2026-09-15 | `next build` (post-cleanup) | build | Pass | Clean. |
+| 2026-09-15 | Deploy | — | — | `vercel --prod`: `dpl_Afi4xSjWsTbigznh7m6o975oj85d`. |
