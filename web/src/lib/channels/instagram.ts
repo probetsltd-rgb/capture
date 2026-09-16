@@ -5,6 +5,7 @@ import { fetchConversationList, fetchConversationMessages } from "./instagram-ap
 import { classifyAndScoreConversations, type CreatedConversation } from "@/lib/ingest/classify-and-score";
 import { extractKnowledgeItems, extractKnowledgeGapQuestions } from "@/lib/ingest/brochure-extract";
 import { redactPii } from "@/lib/classification/redact";
+import { notifyChannelConnectionChange } from "@/lib/notifications/channel-connection";
 
 // channel_connections has zero RLS policies for `authenticated` — see the
 // migration's header comment. All reads/writes go through the service-role
@@ -36,12 +37,25 @@ export async function getInstagramConnectionStatus(
 
 export async function disconnectInstagram(businessId: string): Promise<void> {
   const supabase = createServiceRoleClient();
+
+  // Read the username back before closing the row out — the update below
+  // doesn't return it, and the notification wants it for the email body.
+  const { data: existing } = await supabase
+    .from("channel_connections")
+    .select("username")
+    .eq("business_id", businessId)
+    .eq("channel", "instagram")
+    .is("disconnected_at", null)
+    .maybeSingle();
+
   await supabase
     .from("channel_connections")
     .update({ disconnected_at: new Date().toISOString() })
     .eq("business_id", businessId)
     .eq("channel", "instagram")
     .is("disconnected_at", null);
+
+  await notifyChannelConnectionChange({ businessId, channel: "instagram", action: "disconnected", username: existing?.username ?? null });
 }
 
 // Meta's Data Deletion Instructions requirement (META_APP_REVIEW.md §5) —
@@ -83,7 +97,16 @@ export async function deleteInstagramData(
     .delete()
     .eq("business_id", businessId)
     .eq("channel", "instagram")
-    .select("id");
+    .select("id, username");
+
+  if (deletedConnections && deletedConnections.length > 0) {
+    await notifyChannelConnectionChange({
+      businessId,
+      channel: "instagram",
+      action: "disconnected",
+      username: deletedConnections[0].username ?? null,
+    });
+  }
 
   const result = {
     customersDeleted: deletedCustomers?.length ?? 0,
@@ -170,6 +193,13 @@ export async function saveInstagramConnection(params: {
   });
 
   if (error) throw new Error(`Failed to save Instagram connection: ${error.message}`);
+
+  await notifyChannelConnectionChange({
+    businessId: params.businessId,
+    channel: "instagram",
+    action: "connected",
+    username: params.username,
+  });
 }
 
 // PLANS.md Phase 5.2 — 30-day baseline (Capture_PRD_Addendum_v2.md §16).

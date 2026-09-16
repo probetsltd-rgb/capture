@@ -1183,3 +1183,16 @@ Founder, after the DEV-54 test message arrived: wanted line breaks so the messag
 | 2026-09-15 | Cleanup: both debug routes deleted, dev server killed by exact PID | — | — | `git status` confirmed no trace. |
 | 2026-09-15 | `next build` (post-cleanup) | build | Pass | Clean. |
 | 2026-09-15 | Deploy | — | — | `vercel --prod`: `dpl_Afi4xSjWsTbigznh7m6o975oj85d`. |
+
+## Instagram Connect/Disconnect Email Notifications (DEV-56)
+
+Founder: "when a user disconnects or connects their IG account to Capture, they should get an email notification to that effect."
+
+| Date | Test | Type | Result | Notes |
+|---|---|---|---|---|
+| 2026-09-16 | `tsc --noEmit` after adding `channel-connection.ts` and wiring it into `saveInstagramConnection`/`disconnectInstagram`/`deleteInstagramData` | typecheck | Pass | Clean. |
+| 2026-09-16 | `next build` | build | Pass | Clean. |
+| 2026-09-16 | Real query: `business_members` joined to `auth.users` by `user_id`, scoped to Rave Fashion's real business id — the exact shape `notifyChannelConnectionChange`'s recipient resolution runs | integration (real infra) | Pass | Returned the real owner row (`role: owner`, `email: ravefashion@example.com`), confirming the query is correct against the live schema. |
+| 2026-09-16 | `next build` (final) | build | Pass | Clean. |
+
+**Not live-fire tested this round**: no real email was actually sent — the underlying Resend call is the same proven shape already live-verified via `escalation-email.ts`/`handler-notification.ts`, and a real send to a real person's inbox needs its own fresh ask (see `feedback-testing-rigor` memory). Offered to the founder, not yet run.
