@@ -1196,3 +1196,4 @@ Founder: "when a user disconnects or connects their IG account to Capture, they 
 | 2026-09-16 | `next build` (final) | build | Pass | Clean. |
 
 **Not live-fire tested this round**: no real email was actually sent — the underlying Resend call is the same proven shape already live-verified via `escalation-email.ts`/`handler-notification.ts`, and a real send to a real person's inbox needs its own fresh ask (see `feedback-testing-rigor` memory). Offered to the founder, not yet run.
+| 2026-09-16 | Deploy | — | — | `vercel --prod`: `dpl_AMDXYFCdVaP18bERPzLVHvT7tuRs`. |
