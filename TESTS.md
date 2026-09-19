@@ -1228,3 +1228,5 @@ Founder: "update seo and LLm visibility and discovery"
 | 2026-09-19 | Real local `next start` server: `curl` against `/llms.txt`, `/signup`'s real `<meta name="description">` tag, and `/`'s real `<meta name="description">` tag | integration (real infra) | Pass | All three reflect the fix in actually-served output, not just source. |
 | 2026-09-19 | Rendered `/opengraph-image` and read the real PNG | integration (real infra) | Pass | Share-card text correctly reads "Instant Instagram and WhatsApp replies...". |
 | 2026-09-19 | Cleanup: dev servers killed by exact PID (`28303`, `28995`) | — | — | `git status` confirmed exactly 4 files changed (`web/public/llms.txt`, `app/layout.tsx`, `app/opengraph-image.tsx`, `app/signup/layout.tsx`). |
+| 2026-09-19 | Deploy | — | — | `vercel --prod`: `dpl_DBU6J4jddqXpGP12fisDf5eK1jx7`. |
+| 2026-09-19 | Live production check: `curl https://capture.com.ng/llms.txt` and `/` | integration (real infra) | Pass | Real served `llms.txt` and homepage `<meta name="description">` both confirmed fixed. |
