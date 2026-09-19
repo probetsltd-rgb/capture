@@ -24,7 +24,7 @@ export default function PrivacyPage() {
       <main>
         <div className="shell band prose">
           <h1 className="h2">Capture — Terms &amp; Privacy</h1>
-          <p className="meta">Last updated 2026-09-07.</p>
+          <p className="meta">Last updated 2026-09-19.</p>
 
           <h2>What Capture is</h2>
           <p>
@@ -42,9 +42,10 @@ export default function PrivacyPage() {
               conversation history and helps your team follow up with them.
             </li>
             <li>
-              <strong>Engage</strong> — connects to your business&apos;s own Instagram account and
-              responds to customer Direct Messages using only information you&apos;ve explicitly
-              approved, escalating anything it can&apos;t safely answer to your team.
+              <strong>Engage</strong> — connects to your business&apos;s own Instagram account
+              and/or WhatsApp Business number, and responds to customer messages using only
+              information you&apos;ve explicitly approved, escalating anything it can&apos;t
+              safely answer to your team.
             </li>
           </ul>
           <p>
@@ -68,12 +69,12 @@ export default function PrivacyPage() {
             knowledge base — never general knowledge, never a guess. Anything it isn&apos;t confident is
             fully covered by your approved knowledge, or that needs judgement (price negotiation, a
             complaint, an unusual request), is routed to your team instead of answered automatically. You
-            can take over any conversation at any time, which immediately and permanently stops automated
-            replies on that conversation. If a customer replies while your team is handling it, the assigned
-            team member is notified right away, with a reminder after 10 minutes of no response — Engage
-            never resumes automated replies on its own, since it has no way to know what your team already
-            told the customer. Engage does not autonomously negotiate, issue refunds, process payments, or
-            make bookings.
+            can take over any conversation at any time, which immediately stops automated replies on that
+            conversation. If a customer replies while your team is handling it, the assigned team member is
+            notified right away, with a reminder after 10 minutes of no response — Engage never resumes
+            automated replies on its own, since it has no way to know what your team already told the
+            customer; your team can hand a conversation back to Engage manually, any time, once they&apos;re
+            done. Engage does not autonomously negotiate, issue refunds, process payments, or make bookings.
           </p>
 
           <h2>Data we collect, and why</h2>
@@ -107,6 +108,26 @@ export default function PrivacyPage() {
             answered, never your full message history at once.
           </p>
           <p>
+            <strong>Engage — WhatsApp data specifically:</strong> when you connect your WhatsApp Business
+            number, we access and store:
+          </p>
+          <ul>
+            <li>Your connected WhatsApp Business number and Meta-assigned account/phone identifiers.</li>
+            <li>
+              The access token, encrypted at rest (AES-256-GCM) and never exposed to any browser or client.
+            </li>
+            <li>
+              Message content sent to and from the connected number, and basic sender/recipient
+              identifiers, so Engage can respond to and track conversations.
+            </li>
+          </ul>
+          <p>
+            This data is used the same way as Instagram data above — only to operate Engage for your
+            business. We do not use WhatsApp message content to train AI models, and we don&apos;t share it
+            with any third party except the AI model provider used to generate a reply, and only the
+            specific message being answered.
+          </p>
+          <p>
             <strong>Recover</strong> doesn&apos;t collect data separately — it works from the same
             conversation data Find or Engage already gathered.
           </p>
@@ -129,7 +150,9 @@ export default function PrivacyPage() {
             You can ask us to delete your data at any time by contacting us at{" "}
             <a href="mailto:probetsltd@gmail.com">probetsltd@gmail.com</a>. For Instagram data
             specifically, you can delete it yourself, immediately, from your dashboard — see{" "}
-            <Link href="/data-deletion">Data Deletion Instructions</Link> for exactly how.
+            <Link href="/data-deletion">Data Deletion Instructions</Link> for exactly how. WhatsApp data
+            deletion currently goes through that same email request rather than a self-serve dashboard
+            button.
           </p>
 
           <h2>Your rights</h2>

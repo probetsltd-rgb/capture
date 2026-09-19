@@ -1197,3 +1197,16 @@ Founder: "when a user disconnects or connects their IG account to Capture, they 
 
 **Not live-fire tested this round**: no real email was actually sent — the underlying Resend call is the same proven shape already live-verified via `escalation-email.ts`/`handler-notification.ts`, and a real send to a real person's inbox needs its own fresh ask (see `feedback-testing-rigor` memory). Offered to the founder, not yet run.
 | 2026-09-16 | Deploy | — | — | `vercel --prod`: `dpl_AMDXYFCdVaP18bERPzLVHvT7tuRs`. |
+
+## Site Copy Updated for WhatsApp (DEV-57)
+
+Founder: "update all site copy to reflect current build state. whatsapp ingestion, esclations to whatsapp etc"
+
+| Date | Test | Type | Result | Notes |
+|---|---|---|---|---|
+| 2026-09-19 | `tsc --noEmit` after editing `app/page.tsx`, `app/faq-data.ts`, `app/privacy/page.tsx`, `app/dashboard/page.tsx` | typecheck | Pass | Clean. |
+| 2026-09-19 | `next build` | build | Pass | Clean, all 35 routes generated. |
+| 2026-09-19 | Real local `next dev` server, homepage visually inspected | visual (real infra) | Pass | Hero line reads "Instagram and WhatsApp, both live. Free for 7 days."; Engage product-strip tag reads "Live on Instagram and WhatsApp" — confirmed via screenshot and `find`, not just source inspection. |
+| 2026-09-19 | `git status` | — | Pass | Exactly the 4 intended files changed. |
+
+**Dashboard callout's new condition not click-tested live**: `!instagramConnection.connected && !whatsappConnection.connected` was verified by code review and a clean build, not a real signed-in click-through — `localhost` has no session cookie for the production domain. Each piece it composes (`ConnectWhatsAppButton`, `ReconnectWhatsAppButton`, the Instagram connect link) was already live-verified in earlier sessions (`DEV-35`, `DEV-38`). Worth a real look on the live dashboard post-deploy.

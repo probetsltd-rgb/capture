@@ -144,7 +144,7 @@ export default async function Home() {
                 </a>
               </div>
               <p className="meta" style={{ marginTop: "var(--s5)" }}>
-                Instagram today, WhatsApp coming soon. Free for 7 days.
+                Instagram and WhatsApp, both live. Free for 7 days.
               </p>
             </div>
 
@@ -223,7 +223,7 @@ export default async function Home() {
                 n="01"
                 name="Engage"
                 what="Responds to new enquiries instantly, qualifies them, and escalates anything that needs a person."
-                status="Live on Instagram · WhatsApp coming soon"
+                status="Live on Instagram and WhatsApp"
                 href="/signup?intent=engage"
                 cta="Try Engage Free"
               />
@@ -259,7 +259,7 @@ export default async function Home() {
                 Simple pricing to start.
               </h2>
               <p className="body" style={{ marginTop: "var(--s3)", maxWidth: "56ch" }}>
-                One channel (Instagram) today. Try any tier free for 7 days — no card needed.
+                Instagram and WhatsApp both included. Try any tier free for 7 days — no card needed.
               </p>
 
               <div
@@ -343,8 +343,9 @@ export default async function Home() {
               <h2 className="h2">See it work before you commit to it.</h2>
               <p className="body" style={{ marginTop: "var(--s4)" }}>
                 Connect Instagram and Engage builds a baseline from your last 30 days — real
-                conversations, real gaps, not a guess. Five days into your trial, you get a
-                progress report comparing what changed.
+                conversations, real gaps, not a guess. WhatsApp connects too, starting fresh from
+                day one. Five days into your trial, you get a progress report comparing what
+                changed.
               </p>
               <p className="body" style={{ marginTop: "var(--s4)" }}>
                 Only numbers we can actually measure. No invented revenue figures.
@@ -408,7 +409,7 @@ export default async function Home() {
               />
               <WhyItem
                 title="Reaches the right people"
-                body="An escalation emails your team in priority order, not one inbox that has to happen to be watching."
+                body="An escalation reaches your team by email, and by WhatsApp too for anyone who's added a number, in priority order — not one inbox that has to happen to be watching."
               />
               <WhyItem
                 title="Starts from what already happened"

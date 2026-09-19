@@ -17,6 +17,11 @@ export const HOME_FAQS: FaqItem[] = [
       "It needs a Professional Instagram account — Business or Creator, not Personal — since that's what Instagram requires to grant messaging permissions. If your account is Personal, switch it in the Instagram app under Settings → Account type, then connect from your Capture dashboard.",
   },
   {
+    question: "Does Engage work with WhatsApp too?",
+    answer:
+      "Yes — connect your WhatsApp Business number from your dashboard the same way you connect Instagram. One real difference: WhatsApp's API doesn't let us pull past conversations the way Instagram's does, so there's no 30-day history baseline for it — it starts working from the moment you connect, not before.",
+  },
+  {
     question: "What happens when my free trial ends?",
     answer:
       "No card is collected upfront, so nothing is charged automatically. If you haven't picked a plan by the end of your 7 days, Engage stops auto-replying and new messages wait for your team instead — nothing is lost, it just needs a human until you subscribe.",
@@ -29,12 +34,12 @@ export const HOME_FAQS: FaqItem[] = [
   {
     question: "Can I take over a conversation myself?",
     answer:
-      "Yes, any time. Taking over immediately and permanently stops automated replies on that conversation, and you can reply to the customer directly from your Capture dashboard — no need to switch over to Instagram itself. If a customer replies while you're still handling it, we'll notify you right away, plus a reminder if you haven't gotten back to them after 10 minutes — Engage won't jump back in on its own, since it can't see what you've already told them.",
+      "Yes, any time. Taking over immediately stops automated replies on that conversation, and you can reply to the customer directly from your Capture dashboard — no need to switch over to Instagram or WhatsApp itself. If a customer replies while you're still handling it, we'll notify you right away, plus a reminder if you haven't gotten back to them after 10 minutes — Engage won't jump back in on its own, since it can't see what you've already told them. When you're done, you can hand the conversation back to Engage yourself, any time, with the Release to AI button.",
   },
   {
     question: "How do escalations reach my team?",
     answer:
-      "By email, in priority order across however many team members your plan allows — so it reaches an actual person, not just one shared inbox that has to happen to be watched.",
+      "By email always, and by WhatsApp too for any team member who's added a number in Settings — in priority order across however many team members your plan allows, so it reaches an actual person, not just one shared inbox that has to happen to be watched.",
   },
   {
     question: "How much does Recover cost?",

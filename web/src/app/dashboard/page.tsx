@@ -419,7 +419,7 @@ export default async function DashboardPage({
               permission screen, no redirect back) for a Personal account
               instead of surfacing an error — see /api/channels/instagram/
               callback's zero-hit prod logs from that test. */}
-          {!instagramConnection.connected && (
+          {!instagramConnection.connected && !whatsappConnection.connected && (
             <div
               style={{
                 marginTop: "var(--s4)",
@@ -429,19 +429,32 @@ export default async function DashboardPage({
                 background: "var(--paper)",
               }}
             >
-              <h3 className="h3">Connect Instagram to start</h3>
+              <h3 className="h3">Connect a channel to start</h3>
               <p className="body" style={{ marginTop: "var(--s2)" }}>
-                Engage can&apos;t receive or answer enquiries until Instagram is connected. Needs a
-                Professional Instagram account — Business or Creator, not Personal —{" "}
+                Engage can&apos;t receive or answer enquiries until at least one channel is connected.
+                Instagram gives you a 30-day history baseline; WhatsApp starts fresh from the moment you
+                connect — either works. Instagram needs a Professional account — Business or Creator, not
+                Personal —{" "}
                 <Link href="/#faq">more in the FAQ →</Link>.
               </p>
-              <Link
-                href="/api/channels/instagram/connect"
-                className="btn btn--primary"
-                style={{ marginTop: "var(--s4)", display: "inline-block" }}
+              <div
+                style={{
+                  marginTop: "var(--s4)",
+                  display: "flex",
+                  gap: "var(--s4)",
+                  flexWrap: "wrap",
+                  alignItems: "center",
+                }}
               >
-                Connect Instagram →
-              </Link>
+                <Link href="/api/channels/instagram/connect" className="btn btn--primary">
+                  Connect Instagram →
+                </Link>
+                {whatsappConnection.canReconnect ? (
+                  <ReconnectWhatsAppButton businessId={businessId} />
+                ) : whatsappAppId && whatsappConfigId ? (
+                  <ConnectWhatsAppButton appId={whatsappAppId} configId={whatsappConfigId} />
+                ) : null}
+              </div>
             </div>
           )}
           <table className="table" style={{ marginTop: "var(--s5)" }}>
