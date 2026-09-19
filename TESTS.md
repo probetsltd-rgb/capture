@@ -1210,3 +1210,5 @@ Founder: "update all site copy to reflect current build state. whatsapp ingestio
 | 2026-09-19 | `git status` | — | Pass | Exactly the 4 intended files changed. |
 
 **Dashboard callout's new condition not click-tested live**: `!instagramConnection.connected && !whatsappConnection.connected` was verified by code review and a clean build, not a real signed-in click-through — `localhost` has no session cookie for the production domain. Each piece it composes (`ConnectWhatsAppButton`, `ReconnectWhatsAppButton`, the Instagram connect link) was already live-verified in earlier sessions (`DEV-35`, `DEV-38`). Worth a real look on the live dashboard post-deploy.
+| 2026-09-19 | Deploy | — | — | `vercel --prod`: `dpl_HpEGMyPM2m4PsjHHCxTe1hf7qQki`. |
+| 2026-09-19 | Live production check: `curl https://capture.com.ng/` and `/privacy` | integration (real infra) | Pass | Hero line and the new "Engage — WhatsApp data specifically" privacy section both confirmed present in the real served HTML. |
