@@ -30,8 +30,8 @@ export default function Image() {
             Stop losing money from delayed DM responses.
           </div>
           <div style={{ fontSize: 28, color: "#5b6169" }}>
-            Instant Instagram replies, qualified enquiries, and a person in the loop for anything
-            that needs one.
+            Instant Instagram and WhatsApp replies, qualified enquiries, and a person in the loop
+            for anything that needs one.
           </div>
         </div>
       </div>

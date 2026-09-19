@@ -23,7 +23,7 @@ const mono = IBM_Plex_Mono({
 const SITE_URL = "https://capture.com.ng";
 const SITE_NAME = "Capture";
 const DESCRIPTION =
-  "Capture helps established Nigerian businesses stop losing money from delayed DM responses — Engage replies to Instagram enquiries instantly and escalates anything sensitive to a person, while Find and Recover surface revenue already sitting in your existing conversations.";
+  "Capture helps established Nigerian businesses stop losing money from delayed DM responses — Engage replies to Instagram and WhatsApp enquiries instantly and escalates anything sensitive to a person, while Find and Recover surface revenue already sitting in your existing conversations.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -34,6 +34,7 @@ export const metadata: Metadata = {
   description: DESCRIPTION,
   keywords: [
     "Instagram DM automation",
+    "WhatsApp DM automation",
     "instant DM response",
     "customer response time Nigeria",
     "Lagos business automation",

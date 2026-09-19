@@ -1212,3 +1212,19 @@ Founder: "update all site copy to reflect current build state. whatsapp ingestio
 **Dashboard callout's new condition not click-tested live**: `!instagramConnection.connected && !whatsappConnection.connected` was verified by code review and a clean build, not a real signed-in click-through — `localhost` has no session cookie for the production domain. Each piece it composes (`ConnectWhatsAppButton`, `ReconnectWhatsAppButton`, the Instagram connect link) was already live-verified in earlier sessions (`DEV-35`, `DEV-38`). Worth a real look on the live dashboard post-deploy.
 | 2026-09-19 | Deploy | — | — | `vercel --prod`: `dpl_HpEGMyPM2m4PsjHHCxTe1hf7qQki`. |
 | 2026-09-19 | Live production check: `curl https://capture.com.ng/` and `/privacy` | integration (real infra) | Pass | Hero line and the new "Engage — WhatsApp data specifically" privacy section both confirmed present in the real served HTML. |
+
+## SEO/LLM Discovery Updated, Stale llms.txt Fixed (DEV-58)
+
+Founder: "update seo and LLm visibility and discovery"
+
+| Date | Test | Type | Result | Notes |
+|---|---|---|---|---|
+| 2026-09-19 | Surveyed `robots.ts`, `sitemap.ts`, and per-page metadata/canonicals/noindex | audit | No changes needed | Already correctly configured — AI crawlers explicitly allowed, all public pages listed, all authenticated routes `noindex`. |
+| 2026-09-19 | Added `app/llms.txt/route.ts`, ran `next build` | build | Passed, but wrong | Built clean and showed `○ /llms.txt` as a route — but a live `curl` afterward returned completely different, older content. |
+| 2026-09-19 | Investigated the mismatch: `find . -iname "llms*"` outside `.next`/`node_modules` | debug (real infra) | Root cause found | `web/public/llms.txt` already existed (confirmed via `git log` — added in an earlier, pre-Engage-pivot session) and silently wins over the App Router route with no build-time conflict warning. Deleted the dead route rather than ship unreachable code. |
+| 2026-09-19 | Sanity-checked the existing file's "Recover requires Find's report first" claim against `app/recover/page.tsx` before touching it | verification (real infra) | Claim confirmed accurate, left untouched | Both of Recover's own CTAs still route to `/find`, no standalone checkout exists — this claim wasn't actually stale, unlike the WhatsApp one. |
+| 2026-09-19 | Fixed `web/public/llms.txt`'s genuine error ("WhatsApp ingestion is planned but not yet available") and Find's channel description; fixed the same Instagram-only staleness in `app/layout.tsx`'s `DESCRIPTION`/`keywords`, `app/signup/layout.tsx`, and `app/opengraph-image.tsx` | edit | — | — |
+| 2026-09-19 | `tsc --noEmit` and `next build` (after deleting the dead route) | typecheck + build | Pass | Clean; `/llms.txt` no longer listed as an App Router route. |
+| 2026-09-19 | Real local `next start` server: `curl` against `/llms.txt`, `/signup`'s real `<meta name="description">` tag, and `/`'s real `<meta name="description">` tag | integration (real infra) | Pass | All three reflect the fix in actually-served output, not just source. |
+| 2026-09-19 | Rendered `/opengraph-image` and read the real PNG | integration (real infra) | Pass | Share-card text correctly reads "Instant Instagram and WhatsApp replies...". |
+| 2026-09-19 | Cleanup: dev servers killed by exact PID (`28303`, `28995`) | — | — | `git status` confirmed exactly 4 files changed (`web/public/llms.txt`, `app/layout.tsx`, `app/opengraph-image.tsx`, `app/signup/layout.tsx`). |

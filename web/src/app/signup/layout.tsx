@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 // to live here.
 export const metadata: Metadata = {
   title: "Try Engage Free",
-  description: "Start your 7-day free trial of Capture's Engage — instant Instagram DM responses.",
+  description: "Start your 7-day free trial of Capture's Engage — instant Instagram and WhatsApp DM responses.",
   alternates: { canonical: "/signup" },
 };
 
