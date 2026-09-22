@@ -7,6 +7,7 @@ import { getOwnBusinessId } from "@/lib/business-membership";
 import { MAX_AUTOMATIONS_PER_OPPORTUNITY } from "@/lib/recover/rules";
 import { disconnectInstagram, deleteInstagramData, resetInstagramConversationHistory } from "@/lib/channels/instagram";
 import { disconnectWhatsApp, reconnectWhatsApp } from "@/lib/channels/whatsapp";
+import { disconnectFacebook } from "@/lib/channels/facebook";
 import { initializeTransaction, fetchSubscription, disableSubscription } from "@/lib/payments/paystack";
 import { getSiteUrl } from "@/lib/site-url";
 
@@ -186,6 +187,22 @@ export async function disconnectWhatsAppAction(businessId: string): Promise<Acti
   await disconnectWhatsApp(businessId);
   revalidatePath("/dashboard");
   return { ok: true, message: "WhatsApp disconnected." };
+}
+
+export async function disconnectFacebookAction(businessId: string): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { data: claims } = await supabase.auth.getClaims();
+  if (!claims?.claims) return { ok: false, message: "Not signed in." };
+
+  const userId = claims.claims.sub as string;
+  const ownBusinessId = await getOwnBusinessId(supabase, userId);
+  if (!ownBusinessId || ownBusinessId !== businessId) {
+    return { ok: false, message: "Could not disconnect — check you have access to this business." };
+  }
+
+  await disconnectFacebook(businessId);
+  revalidatePath("/dashboard");
+  return { ok: true, message: "Facebook disconnected." };
 }
 
 export async function reconnectWhatsAppAction(businessId: string): Promise<ActionResult> {

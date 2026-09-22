@@ -10,6 +10,7 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { decryptToken } from "@/lib/channels/token-crypto";
 import { sendMessage as sendInstagramMessage, sendMediaMessage as sendInstagramMedia, inferMediaType as inferInstagramMediaType } from "@/lib/channels/instagram-api";
 import { sendMessage as sendWhatsAppMessage, sendMediaMessage as sendWhatsAppMedia, inferMediaType as inferWhatsAppMediaType } from "@/lib/channels/whatsapp-api";
+import { sendMessage as sendFacebookMessage, sendMediaMessage as sendFacebookMedia, inferMediaType as inferFacebookMediaType } from "@/lib/channels/facebook-api";
 
 // The kill switch (PRD §23: "when a human takes over, AI stops") is
 // enforced here, not just hidden behind a UI button — a conversation is
@@ -646,7 +647,7 @@ async function dispatchResponse(
   if (!customer?.external_customer_id) return;
 
   const channel = conversation.channel as string;
-  if (channel !== "instagram" && channel !== "whatsapp") return;
+  if (channel !== "instagram" && channel !== "whatsapp" && channel !== "facebook") return;
 
   const { data: connection } = await supabase
     .from("channel_connections")
@@ -658,9 +659,9 @@ async function dispatchResponse(
   if (!connection) return;
 
   const accessToken = decryptToken(connection.access_token_encrypted);
-  const send = channel === "instagram" ? sendInstagramMessage : sendWhatsAppMessage;
-  const sendMedia = channel === "instagram" ? sendInstagramMedia : sendWhatsAppMedia;
-  const inferMediaType = channel === "instagram" ? inferInstagramMediaType : inferWhatsAppMediaType;
+  const send = channel === "instagram" ? sendInstagramMessage : channel === "whatsapp" ? sendWhatsAppMessage : sendFacebookMessage;
+  const sendMedia = channel === "instagram" ? sendInstagramMedia : channel === "whatsapp" ? sendWhatsAppMedia : sendFacebookMedia;
+  const inferMediaType = channel === "instagram" ? inferInstagramMediaType : channel === "whatsapp" ? inferWhatsAppMediaType : inferFacebookMediaType;
 
   await send(accessToken, connection.external_account_id, customer.external_customer_id, response);
   if (mediaUrl) {

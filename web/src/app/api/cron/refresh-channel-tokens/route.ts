@@ -32,6 +32,12 @@ export async function GET(request: NextRequest) {
   const supabase = createServiceRoleClient();
   const refreshBefore = new Date(Date.now() + REFRESH_WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString();
 
+  // Facebook connections (added OUTSTANDINGS.md "Channel roadmap confirmed
+  // 2026-09-08") are saved with token_expires_at: null — Page Access
+  // Tokens derived from a long-lived User token carry no documented
+  // expiration (facebook.ts's saveFacebookConnection comment) — so this
+  // `not(token_expires_at, is, null)` filter already excludes them here,
+  // same as any other no-refresh-mechanism connection type.
   const { data: connections, error } = await supabase
     .from("channel_connections")
     .select("id, channel, access_token_encrypted, token_expires_at, updated_at")

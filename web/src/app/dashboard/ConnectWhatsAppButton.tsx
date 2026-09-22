@@ -1,21 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import type { FacebookSdk } from "@/types/facebook-sdk";
 
 declare global {
   interface Window {
-    FB?: {
-      init: (params: { appId: string; autoLogAppEvents: boolean; xfbml: boolean; version: string }) => void;
-      login: (
-        callback: (response: { authResponse?: { code?: string } }) => void,
-        params: {
-          config_id: string;
-          response_type: "code";
-          override_default_response_type: true;
-          extras: { setup: Record<string, never> };
-        },
-      ) => void;
-    };
+    FB?: FacebookSdk;
   }
 }
 

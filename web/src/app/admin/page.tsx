@@ -93,7 +93,9 @@ export default async function AdminPage() {
   const realBusinessIdSet = new Set(realBusinessIds);
   const preventConvIds = (conversations ?? [])
     .filter(
-      (c) => (c.source === "whatsapp_api" || c.source === "instagram_api") && realBusinessIdSet.has(c.business_id),
+      (c) =>
+        (c.source === "whatsapp_api" || c.source === "instagram_api" || c.source === "facebook_api") &&
+        realBusinessIdSet.has(c.business_id),
     )
     .map((c) => c.id);
   const { count: handledMessagesCount } = preventConvIds.length

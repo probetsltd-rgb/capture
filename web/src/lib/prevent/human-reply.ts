@@ -3,6 +3,7 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { decryptToken } from "@/lib/channels/token-crypto";
 import { sendMessage as sendInstagramMessage } from "@/lib/channels/instagram-api";
 import { sendMessage as sendWhatsAppMessage } from "@/lib/channels/whatsapp-api";
+import { sendMessage as sendFacebookMessage } from "@/lib/channels/facebook-api";
 
 export type HumanReplyResult = { ok: boolean; message: string };
 
@@ -115,6 +116,31 @@ export async function sendHumanReply(
         ok: false,
         message:
           "Couldn't send — WhatsApp rejected the message. This usually means the 24-hour reply window since the customer's last message has closed.",
+      };
+    }
+  } else if (conversation.channel === "facebook") {
+    const { data: connection } = await supabase
+      .from("channel_connections")
+      .select("access_token_encrypted, external_account_id")
+      .eq("business_id", businessId)
+      .eq("channel", "facebook")
+      .is("disconnected_at", null)
+      .maybeSingle();
+    if (!connection) return { ok: false, message: "Facebook isn't connected for this business." };
+
+    try {
+      await sendFacebookMessage(
+        decryptToken(connection.access_token_encrypted),
+        connection.external_account_id,
+        customer.external_customer_id,
+        trimmed,
+      );
+    } catch (err) {
+      console.error("Human reply send failed", { businessId, conversationId, err });
+      return {
+        ok: false,
+        message:
+          "Couldn't send — Facebook rejected the message. This usually means the 24-hour reply window since the customer's last message has closed.",
       };
     }
   } else {

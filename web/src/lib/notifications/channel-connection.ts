@@ -18,6 +18,7 @@ function getResend(): Resend | null {
 const CHANNEL_LABEL: Record<string, string> = {
   instagram: "Instagram",
   whatsapp: "WhatsApp",
+  facebook: "Facebook",
   other: "Other",
 };
 
@@ -44,7 +45,7 @@ async function getAllBusinessMemberEmails(businessId: string): Promise<string[]>
 
 export type ChannelConnectionEvent = {
   businessId: string;
-  channel: "instagram";
+  channel: "instagram" | "facebook";
   action: "connected" | "disconnected";
   // The connected account's handle, when known — disconnectInstagram()
   // reads it back from the row being closed out before the notification

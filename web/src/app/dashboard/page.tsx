@@ -7,9 +7,12 @@ import { computePreventSummary } from "@/lib/prevent/summary";
 import { computeNorthStar } from "@/lib/report/north-star";
 import { getInstagramConnectionStatus } from "@/lib/channels/instagram";
 import { getWhatsAppConnectionStatus } from "@/lib/channels/whatsapp";
+import { getFacebookConnectionStatus } from "@/lib/channels/facebook";
 import { ConnectWhatsAppButton } from "./ConnectWhatsAppButton";
 import { ReconnectWhatsAppButton } from "./ReconnectWhatsAppButton";
 import { DisconnectWhatsAppButton } from "./DisconnectWhatsAppButton";
+import { ConnectFacebookButton } from "./ConnectFacebookButton";
+import { DisconnectFacebookButton } from "./DisconnectFacebookButton";
 import { generateRevenueLeakReport } from "@/lib/report/generate";
 import { computeResponseTimeStats, formatResponseDuration } from "@/lib/report/response-time";
 import { checkBillingGate } from "@/lib/prevent/process";
@@ -53,6 +56,8 @@ export default async function DashboardPage({
   // props rather than duplicated under a NEXT_PUBLIC_ name.
   const whatsappAppId = process.env.WHATSAPP_APP_ID ?? null;
   const whatsappConfigId = process.env.WHATSAPP_CONFIG_ID ?? null;
+  const facebookAppId = process.env.FACEBOOK_APP_ID ?? null;
+  const facebookConfigId = process.env.FACEBOOK_CONFIG_ID ?? null;
 
   const supabase = await createClient();
   const { data: claims } = await supabase.auth.getClaims();
@@ -88,6 +93,7 @@ export default async function DashboardPage({
     { data: plans },
     instagramConnection,
     whatsappConnection,
+    facebookConnection,
   ] = await Promise.all([
     supabase.from("opportunities").select("status, actual_revenue").eq("business_id", businessId),
     supabase.from("conversations").select("id").eq("business_id", businessId).eq("source", "manual_export").limit(1),
@@ -95,11 +101,13 @@ export default async function DashboardPage({
       .from("conversations")
       .select("id, escalated_at, qualification, ai_followup_count")
       .eq("business_id", businessId)
-      // whatsapp_api + instagram_api — this filter silently excluded real,
-      // live Instagram conversations from the "Prevent" stats table below
-      // until 2026-08-15 (same bug independently found and fixed the same
-      // day on /admin/page.tsx and /admin/prevent/[businessId]/page.tsx).
-      .in("source", ["whatsapp_api", "instagram_api"]),
+      // whatsapp_api + instagram_api + facebook_api — this filter silently
+      // excluded real, live Instagram conversations from the "Prevent"
+      // stats table below until 2026-08-15 (same bug independently found
+      // and fixed the same day on /admin/page.tsx and
+      // /admin/prevent/[businessId]/page.tsx) — facebook_api added here
+      // from day one this time.
+      .in("source", ["whatsapp_api", "instagram_api", "facebook_api"]),
     supabase
       .from("knowledge_items")
       .select("id", { count: "exact", head: true })
@@ -117,6 +125,7 @@ export default async function DashboardPage({
     supabase.from("plans").select("id, display_name, tier, billing_interval, price_kobo, message_limit, escalation_notification_limit, has_analytics"),
     getInstagramConnectionStatus(businessId),
     getWhatsAppConnectionStatus(businessId),
+    getFacebookConnectionStatus(businessId),
   ]);
 
   // Founder request 2026-08-21 (pay-to-continue billing) — same gate
@@ -419,7 +428,7 @@ export default async function DashboardPage({
               permission screen, no redirect back) for a Personal account
               instead of surfacing an error — see /api/channels/instagram/
               callback's zero-hit prod logs from that test. */}
-          {!instagramConnection.connected && !whatsappConnection.connected && (
+          {!instagramConnection.connected && !whatsappConnection.connected && !facebookConnection.connected && (
             <div
               style={{
                 marginTop: "var(--s4)",
@@ -432,9 +441,9 @@ export default async function DashboardPage({
               <h3 className="h3">Connect a channel to start</h3>
               <p className="body" style={{ marginTop: "var(--s2)" }}>
                 Engage can&apos;t receive or answer enquiries until at least one channel is connected.
-                Instagram gives you a 30-day history baseline; WhatsApp starts fresh from the moment you
-                connect — either works. Instagram needs a Professional account — Business or Creator, not
-                Personal —{" "}
+                Instagram gives you a 30-day history baseline; WhatsApp and Facebook start fresh from the
+                moment you connect — any of the three works. Instagram needs a Professional account —
+                Business or Creator, not Personal —{" "}
                 <Link href="/#faq">more in the FAQ →</Link>.
               </p>
               <div
@@ -453,6 +462,9 @@ export default async function DashboardPage({
                   <ReconnectWhatsAppButton businessId={businessId} />
                 ) : whatsappAppId && whatsappConfigId ? (
                   <ConnectWhatsAppButton appId={whatsappAppId} configId={whatsappConfigId} />
+                ) : null}
+                {facebookAppId && facebookConfigId ? (
+                  <ConnectFacebookButton appId={facebookAppId} configId={facebookConfigId} />
                 ) : null}
               </div>
             </div>
@@ -512,6 +524,21 @@ export default async function DashboardPage({
                     </span>
                   ) : whatsappAppId && whatsappConfigId ? (
                     <ConnectWhatsAppButton appId={whatsappAppId} configId={whatsappConfigId} />
+                  ) : (
+                    "Not available yet"
+                  )}
+                </td>
+              </tr>
+              <tr>
+                <td>Facebook</td>
+                <td>
+                  {facebookConnection.connected ? (
+                    <span style={{ display: "inline-flex", gap: "var(--s3)", alignItems: "center", flexWrap: "wrap" }}>
+                      Connected{facebookConnection.pageName ? ` — ${facebookConnection.pageName}` : ""}
+                      <DisconnectFacebookButton businessId={businessId} />
+                    </span>
+                  ) : facebookAppId && facebookConfigId ? (
+                    <ConnectFacebookButton appId={facebookAppId} configId={facebookConfigId} />
                   ) : (
                     "Not available yet"
                   )}

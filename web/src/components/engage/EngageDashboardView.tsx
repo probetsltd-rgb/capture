@@ -73,11 +73,12 @@ export async function EngageDashboardView({
     .from("conversations")
     .select("id, channel, state, escalation_reason, escalated_at, assigned_to, qualification, ai_followup_count, customer_id")
     .eq("business_id", businessId)
-    // whatsapp_api + instagram_api — excludes Find's uploaded historical
-    // exports (source: manual_export). instagram_api added 2026-08-15 after
-    // this filter silently hid a real, live-received Instagram conversation
-    // from its own business owner.
-    .in("source", ["whatsapp_api", "instagram_api"])
+    // whatsapp_api + instagram_api + facebook_api — excludes Find's
+    // uploaded historical exports (source: manual_export). instagram_api
+    // added 2026-08-15 after this filter silently hid a real, live-received
+    // Instagram conversation from its own business owner; facebook_api
+    // added from day one this time.
+    .in("source", ["whatsapp_api", "instagram_api", "facebook_api"])
     // Most recent real activity first, not row-insertion order — a
     // conversation created during the historical import but receiving
     // brand-new live messages today should surface near the top, not stay
