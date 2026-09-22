@@ -130,7 +130,7 @@ export default async function Home() {
         <section className="band">
           <div className="shell hero">
             <div className="hero__copy">
-              <h1 className="display">Stop losing money from delayed DM responses.</h1>
+              <h1 className="display">Stop losing sales from delayed DM responses.</h1>
               <p className="lede" style={{ marginTop: "var(--s5)" }}>
                 We respond instantly, qualify enquiries and follow up — while keeping your team in
                 the loop for anything that needs a person.

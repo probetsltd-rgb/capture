@@ -27,7 +27,7 @@ export default function Image() {
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 24, maxWidth: 980 }}>
           <div style={{ fontSize: 60, color: "#15171a", fontWeight: 600, lineHeight: 1.15 }}>
-            Stop losing money from delayed DM responses.
+            Stop losing sales from delayed DM responses.
           </div>
           <div style={{ fontSize: 28, color: "#5b6169" }}>
             Instant Instagram and WhatsApp replies, qualified enquiries, and a person in the loop
