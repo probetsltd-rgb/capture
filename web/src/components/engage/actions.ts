@@ -243,6 +243,7 @@ async function extractKnowledgeFromTeamReplies(
       content: item.content,
       media_url: null,
       approved_at: null, // pending review, same as brochure/historical items
+      source: "conversation_close",
     })),
   );
 }

@@ -60,6 +60,7 @@ export async function addKnowledgeItem(
     content,
     media_url: mediaUrl,
     approved_at: new Date().toISOString(),
+    source: "manual",
   });
   if (error) return { ok: false, message: "Could not save — check you have access to this business." };
 
@@ -137,6 +138,7 @@ export async function addKnowledgeItemsBulk(
       question: null,
       content,
       approved_at: new Date().toISOString(),
+      source: "manual",
     })),
   );
   if (error) return { ok: false, message: "Could not save — check you have access to this business." };
@@ -231,6 +233,7 @@ export async function uploadBrochure(businessId: string, formData: FormData): Pr
       content: item.content,
       media_url: null,
       approved_at: null, // pending review — same gate as vertical-template suggestions
+      source: "document",
     })),
   );
   if (error) return { ok: false, message: "Could not save — check you have access to this business." };
@@ -272,6 +275,7 @@ export async function extractKnowledgeFromWebsite(businessId: string, url: strin
       content: item.content,
       media_url: null,
       approved_at: null, // pending review — same gate as every other extracted source
+      source: "website",
     })),
   );
   if (error) return { ok: false, message: "Could not save — check you have access to this business." };
@@ -319,6 +323,7 @@ export async function answerKnowledgeGapQuestion(
       content,
       media_url: null,
       approved_at: new Date().toISOString(),
+      source: "manual",
     })
     .select("id")
     .single();

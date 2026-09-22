@@ -403,6 +403,7 @@ async function seedKnowledgeFromHistory(
         content: item.content,
         media_url: null,
         approved_at: null, // pending review, same as brochure/manual items
+        source: "instagram_import",
       })),
     );
   }

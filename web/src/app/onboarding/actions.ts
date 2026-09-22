@@ -76,6 +76,7 @@ async function applyVerticalTemplate(businessId: string, industry: string): Prom
         question: item.question,
         content: item.content,
         approved_at: null,
+        source: "vertical_template",
       })),
     );
     if (insertError) return false;

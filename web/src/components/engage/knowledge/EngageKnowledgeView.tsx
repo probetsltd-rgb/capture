@@ -9,6 +9,24 @@ import { ApproveButton } from "./ApproveButton";
 import { CompletenessToggle } from "./CompletenessToggle";
 import { KnowledgeGapQuestions } from "./KnowledgeGapQuestions";
 
+// Human-readable label for knowledge_items.source (see
+// 20260922000000_knowledge_item_source.sql) — lets an owner reviewing the
+// "Needs your review" queue tell a genuinely-extracted-from-their-own-team's-
+// replies item apart from a generic template or scraped document.
+const SOURCE_LABELS: Record<string, string> = {
+  manual: "added by you",
+  vertical_template: "industry starter template",
+  document: "uploaded document",
+  website: "your website",
+  instagram_import: "past Instagram replies",
+  conversation_close: "your team's replies",
+  unknown: "unknown (added before source tracking)",
+};
+
+function sourceLabel(source: string): string {
+  return SOURCE_LABELS[source] ?? source;
+}
+
 // Shared body for /admin/engage/[businessId]/knowledge and
 // /dashboard/engage/knowledge — see EngageDashboardView.tsx for why.
 export async function EngageKnowledgeView({
@@ -38,7 +56,7 @@ export async function EngageKnowledgeView({
 
   const { data: items } = await supabase
     .from("knowledge_items")
-    .select("id, category, question, content, approved_at, media_url")
+    .select("id, category, question, content, approved_at, media_url, source")
     .eq("business_id", businessId)
     .order("category");
 
@@ -86,10 +104,10 @@ export async function EngageKnowledgeView({
           </div>
           <div className="panel__body">
             <p className="meta">
-              These came from an industry starter template or an uploaded document. They are{" "}
-              <strong>suggestions, not facts</strong> — the AI will not use any of them until you confirm each one
-              is correct for your business. Edit is not supported yet: delete anything that&apos;s wrong and add
-              your own version above.
+              These came from an industry starter template, an uploaded document, your website, past
+              conversations, or your team&apos;s own replies. They are <strong>suggestions, not facts</strong> —
+              the AI will not use any of them until you confirm each one is correct for your business. Edit is not
+              supported yet: delete anything that&apos;s wrong and add your own version above.
             </p>
             <ul style={{ listStyle: "none", padding: 0, marginTop: "var(--s3)" }}>
               {pending.map((item) => (
@@ -97,6 +115,7 @@ export async function EngageKnowledgeView({
                   <strong>[{item.category}]</strong> {item.question && <em>{item.question} — </em>}
                   {item.content}
                   {item.media_url && <span className="meta"> 📎 media attached</span>}
+                  <span className="meta"> — from {sourceLabel(item.source as string)}</span>
                   <span style={{ display: "inline-flex", gap: "var(--s3)", marginLeft: "var(--s3)" }}>
                     <ApproveButton businessId={businessId} itemId={item.id} />
                     <DeleteButton businessId={businessId} itemId={item.id} />
@@ -119,6 +138,7 @@ export async function EngageKnowledgeView({
                 <strong>[{item.category}]</strong> {item.question && <em>{item.question} — </em>}
                 {item.content}
                 {item.media_url && <span className="meta"> 📎 media attached</span>}
+                <span className="meta"> — from {sourceLabel(item.source as string)}</span>
                 <span style={{ marginLeft: "var(--s3)" }}>
                   <DeleteButton businessId={businessId} itemId={item.id} />
                 </span>
