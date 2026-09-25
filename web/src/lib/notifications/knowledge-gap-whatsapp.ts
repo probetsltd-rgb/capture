@@ -21,24 +21,24 @@ import { recordKnowledgeGapQuestionRoute } from "@/lib/notifications/whatsapp-re
 // escalation built today would silently behave as "escalates once a day
 // at most," not the real SLA it would look like from the code. Revisit
 // once DEP-10 clears.
-// v3: v1 ("Capture has a question about your business") and v2 ("setup
-// found a gap... reply with the answer") both got auto-reclassified by
-// Meta from the requested UTILITY to MARKETING (stricter opt-in/delivery
-// rules, ~6x the per-message cost) — v2 despite using the same "tie it to
-// a setup action" framing that worked for flow 2's templates
-// (knowledge-review-whatsapp.ts). Working theory: it's the OPEN-ENDED
-// free-text solicitation ("reply with the answer") that reads as
-// survey/engagement to Meta's classifier, not the wording around it —
-// their own utility criteria tie feedback-survey eligibility to a
-// specific existing order, which a knowledge gap has none of. v3
-// reframes as an account-completion ALERT (a missing field, closer to
-// Meta's explicit "account alerts" utility example) rather than a
-// question being posed, even though the substituted {{1}} content is
-// still literally a question — the surrounding language states what's
-// missing instead of asking for it. Templates can't be deleted via the
-// API once created — knowledge_gap_question and _v2 are left in place,
-// unreferenced, same precedent as escalation_alert -> escalation_alert_v2.
-const TEMPLATE_NAME = "knowledge_gap_question_v3";
+// v4: v1, v2, and v3 all got reclassified/submitted to MARKETING
+// regardless of wording (three separate attempts, including framings that
+// worked for flow 2's templates) — confirms it's the open-ended
+// free-text-answer shape itself, not the phrasing, triggering it. Founder
+// decision 2026-09-25: stop fighting the classifier, submit directly as
+// MARKETING, and reword for the reader instead of for utility-eligibility
+// — "Quick one — a customer might ask: {{1}}... I'll add it to your
+// knowledge base right away" explains the payoff instead of reading as an
+// account-deficiency notice. Real, honest tradeoff worth knowing: Meta's
+// WhatsApp policy expects opt-in consent for MARKETING sends (a business
+// setting a notification number in Capture's own settings page, for the
+// specific purpose of receiving Capture notifications, is a reasonable
+// opt-in — not cold outreach — but this is a materially different
+// compliance posture than UTILITY had). Templates can't be deleted via
+// the API once created — knowledge_gap_question, _v2, and _v3 are left in
+// place, unreferenced, same precedent as escalation_alert ->
+// escalation_alert_v2.
+const TEMPLATE_NAME = "knowledge_gap_question_v4";
 const TEMPLATE_LANGUAGE = "en_US";
 const NOTIFICATION_BUSINESS_ID = process.env.WHATSAPP_NOTIFICATION_BUSINESS_ID;
 
