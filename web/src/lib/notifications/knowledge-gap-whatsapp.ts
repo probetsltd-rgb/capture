@@ -21,7 +21,19 @@ import { recordKnowledgeGapQuestionRoute } from "@/lib/notifications/whatsapp-re
 // escalation built today would silently behave as "escalates once a day
 // at most," not the real SLA it would look like from the code. Revisit
 // once DEP-10 clears.
-const TEMPLATE_NAME = "knowledge_gap_question";
+// v2, not v1: the original "Capture has a question about your business"
+// wording read as unprompted, generic outreach and got auto-reclassified
+// by Meta from the requested UTILITY to MARKETING (stricter opt-in/
+// delivery rules, ~6x the per-message cost). Reworded to explicitly tie
+// the message to a setup action the business already took (connecting a
+// channel, which triggers knowledge-base seeding) — matches Meta's own
+// documented utility criteria ("account setup assistance" / "support
+// continuation... following up on issues customers initiated elsewhere"),
+// confirmed against their current template-categorization docs before
+// rewording, not guessed. Templates can't be deleted via the API once
+// created — knowledge_gap_question (v1) is left in place, unreferenced,
+// same precedent as escalation_alert -> escalation_alert_v2.
+const TEMPLATE_NAME = "knowledge_gap_question_v2";
 const TEMPLATE_LANGUAGE = "en_US";
 const NOTIFICATION_BUSINESS_ID = process.env.WHATSAPP_NOTIFICATION_BUSINESS_ID;
 
