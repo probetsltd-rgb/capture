@@ -21,19 +21,24 @@ import { recordKnowledgeGapQuestionRoute } from "@/lib/notifications/whatsapp-re
 // escalation built today would silently behave as "escalates once a day
 // at most," not the real SLA it would look like from the code. Revisit
 // once DEP-10 clears.
-// v2, not v1: the original "Capture has a question about your business"
-// wording read as unprompted, generic outreach and got auto-reclassified
-// by Meta from the requested UTILITY to MARKETING (stricter opt-in/
-// delivery rules, ~6x the per-message cost). Reworded to explicitly tie
-// the message to a setup action the business already took (connecting a
-// channel, which triggers knowledge-base seeding) — matches Meta's own
-// documented utility criteria ("account setup assistance" / "support
-// continuation... following up on issues customers initiated elsewhere"),
-// confirmed against their current template-categorization docs before
-// rewording, not guessed. Templates can't be deleted via the API once
-// created — knowledge_gap_question (v1) is left in place, unreferenced,
-// same precedent as escalation_alert -> escalation_alert_v2.
-const TEMPLATE_NAME = "knowledge_gap_question_v2";
+// v3: v1 ("Capture has a question about your business") and v2 ("setup
+// found a gap... reply with the answer") both got auto-reclassified by
+// Meta from the requested UTILITY to MARKETING (stricter opt-in/delivery
+// rules, ~6x the per-message cost) — v2 despite using the same "tie it to
+// a setup action" framing that worked for flow 2's templates
+// (knowledge-review-whatsapp.ts). Working theory: it's the OPEN-ENDED
+// free-text solicitation ("reply with the answer") that reads as
+// survey/engagement to Meta's classifier, not the wording around it —
+// their own utility criteria tie feedback-survey eligibility to a
+// specific existing order, which a knowledge gap has none of. v3
+// reframes as an account-completion ALERT (a missing field, closer to
+// Meta's explicit "account alerts" utility example) rather than a
+// question being posed, even though the substituted {{1}} content is
+// still literally a question — the surrounding language states what's
+// missing instead of asking for it. Templates can't be deleted via the
+// API once created — knowledge_gap_question and _v2 are left in place,
+// unreferenced, same precedent as escalation_alert -> escalation_alert_v2.
+const TEMPLATE_NAME = "knowledge_gap_question_v3";
 const TEMPLATE_LANGUAGE = "en_US";
 const NOTIFICATION_BUSINESS_ID = process.env.WHATSAPP_NOTIFICATION_BUSINESS_ID;
 
