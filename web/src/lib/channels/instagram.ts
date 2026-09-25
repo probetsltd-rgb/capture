@@ -6,6 +6,7 @@ import { classifyAndScoreConversations, type CreatedConversation } from "@/lib/i
 import { extractKnowledgeItems, extractKnowledgeGapQuestions } from "@/lib/ingest/brochure-extract";
 import { redactPii } from "@/lib/classification/redact";
 import { notifyChannelConnectionChange } from "@/lib/notifications/channel-connection";
+import { sendNextPendingGapQuestion } from "@/lib/notifications/knowledge-gap-whatsapp";
 
 // channel_connections has zero RLS policies for `authenticated` — see the
 // migration's header comment. All reads/writes go through the service-role
@@ -420,6 +421,12 @@ async function seedKnowledgeFromHistory(
         question: q.question,
       })),
     );
+    // "Update the knowledge base via WhatsApp" flow 1 (scoped in chat
+    // 2026-09-25) — kicks off the one-question-at-a-time WhatsApp queue for
+    // a freshly-seeded business; a no-op if nobody has a WhatsApp number set
+    // (stays purely dashboard-driven) or Capture's own notification number
+    // isn't connected.
+    void sendNextPendingGapQuestion(businessId);
   }
 
   await supabase.from("businesses").update({ knowledge_base_seeded_at: new Date().toISOString() }).eq("id", businessId);

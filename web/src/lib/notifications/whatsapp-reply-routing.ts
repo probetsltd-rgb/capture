@@ -98,6 +98,50 @@ export async function resolveWhatsAppReplyRoute(
   return { businessId: route.business_id, conversationId: route.conversation_id };
 }
 
+// Sibling to recordWhatsAppReplyRoute/resolveWhatsAppReplyRoute above, for
+// "update the knowledge base via WhatsApp" flow 1 (scoped in chat
+// 2026-09-25) — a gap question has no conversation, so it gets its own
+// table (knowledge_gap_question_routes) rather than a nullable
+// conversation_id on the existing one. Same recipient-match security
+// property as resolveWhatsAppReplyRoute: a match only succeeds for the
+// exact phone number that specific question was sent to.
+export async function recordKnowledgeGapQuestionRoute(params: {
+  businessId: string;
+  knowledgeGapQuestionId: string;
+  whatsappMessageId: string;
+  recipientWaId: string;
+}): Promise<void> {
+  const supabase = createServiceRoleClient();
+  const { error } = await supabase.from("knowledge_gap_question_routes").insert({
+    business_id: params.businessId,
+    knowledge_gap_question_id: params.knowledgeGapQuestionId,
+    whatsapp_message_id: params.whatsappMessageId,
+    recipient_wa_id: normalizeWaId(params.recipientWaId),
+  });
+  if (error) {
+    console.error("Failed to record knowledge gap question route", { businessId: params.businessId, error });
+  }
+}
+
+export type ResolvedGapQuestionRoute = { businessId: string; knowledgeGapQuestionId: string };
+
+export async function resolveKnowledgeGapQuestionRoute(
+  contextMessageId: string | undefined,
+  fromWaId: string,
+): Promise<ResolvedGapQuestionRoute | null> {
+  if (!contextMessageId) return null;
+
+  const supabase = createServiceRoleClient();
+  const { data: route } = await supabase
+    .from("knowledge_gap_question_routes")
+    .select("business_id, knowledge_gap_question_id, recipient_wa_id")
+    .eq("whatsapp_message_id", contextMessageId)
+    .maybeSingle();
+  if (!route || route.recipient_wa_id !== normalizeWaId(fromWaId)) return null;
+
+  return { businessId: route.business_id, knowledgeGapQuestionId: route.knowledge_gap_question_id };
+}
+
 // Reverse of handler-notification.ts's own lookup (which goes email ->
 // whatsapp_number to find where to send) — this goes whatsapp_number ->
 // email, needed so a routed reply can be attributed to (and the

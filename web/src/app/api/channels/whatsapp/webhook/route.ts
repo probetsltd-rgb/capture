@@ -5,7 +5,8 @@ import { getConnectionByPhoneNumberId, findOrCreateConversationForInboundMessage
 import { sendMessage, sendMediaMessage, inferMediaType } from "@/lib/channels/whatsapp-api";
 import { handleInboundMessage, takeConversation } from "@/lib/prevent/process";
 import { sendHumanReply } from "@/lib/prevent/human-reply";
-import { resolveWhatsAppReplyRoute, resolveHandlerEmailByWhatsAppNumber } from "@/lib/notifications/whatsapp-reply-routing";
+import { resolveWhatsAppReplyRoute, resolveHandlerEmailByWhatsAppNumber, resolveKnowledgeGapQuestionRoute } from "@/lib/notifications/whatsapp-reply-routing";
+import { handleGapQuestionWhatsAppReply } from "@/lib/notifications/knowledge-gap-whatsapp";
 
 // WhatsApp Cloud API webhook receiver. Deliberately its own route, not a
 // branch inside the Instagram one — the payload shape is genuinely
@@ -175,6 +176,18 @@ async function processOneMessage(value: WhatsAppValue, message: WhatsAppMessage)
       });
     }
     await sendHumanReply(route.businessId, route.conversationId, message.text.body, message.id);
+    return;
+  }
+
+  // "Update the knowledge base via WhatsApp" flow 1 (scoped in chat
+  // 2026-09-25) — a swipe-reply to a knowledge-gap-question push, same
+  // "checked before findOrCreateConversationForInboundMessage" placement
+  // and reasoning as the conversation-reply route above: a match here must
+  // never create a stray customer/conversation from the recipient's own
+  // number either.
+  const gapQuestionRoute = await resolveKnowledgeGapQuestionRoute(message.context?.id, message.from);
+  if (gapQuestionRoute) {
+    await handleGapQuestionWhatsAppReply(gapQuestionRoute.businessId, gapQuestionRoute.knowledgeGapQuestionId, message.text.body, message.from);
     return;
   }
 

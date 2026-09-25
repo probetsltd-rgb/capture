@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { uploadKnowledgeMedia } from "@/lib/media/upload";
 import { extractTextFromPdf, extractKnowledgeItems } from "@/lib/ingest/brochure-extract";
 import { fetchWebsiteText } from "@/lib/ingest/website-extract";
+import { sendNextPendingGapQuestion } from "@/lib/notifications/knowledge-gap-whatsapp";
 
 export type ActionResult = { ok: boolean; message: string };
 
@@ -336,6 +337,11 @@ export async function answerKnowledgeGapQuestion(
     .eq("id", questionId)
     .eq("business_id", businessId);
 
+  // Answering here (the web form) resolves the same one-question-at-a-time
+  // WhatsApp queue as answering via WhatsApp does — advances it regardless
+  // of which surface a question actually got resolved on.
+  void sendNextPendingGapQuestion(businessId);
+
   revalidateKnowledgePaths(businessId);
   return { ok: true, message: "Added — the AI can use this right away." };
 }
@@ -354,6 +360,8 @@ export async function dismissKnowledgeGapQuestion(businessId: string, questionId
   if (!data || data.length === 0) {
     return { ok: false, message: "This question is no longer available." };
   }
+
+  void sendNextPendingGapQuestion(businessId);
 
   revalidateKnowledgePaths(businessId);
   return { ok: true, message: "Skipped." };
