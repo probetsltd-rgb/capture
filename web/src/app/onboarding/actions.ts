@@ -6,6 +6,7 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { generateUploadToken } from "@/lib/upload-token";
 import { INDUSTRIES, CONSENT_VERSION } from "@/app/find/constants";
+import { notifyPendingKnowledgeItems } from "@/lib/notifications/knowledge-review-whatsapp";
 
 export type ActionResult = { ok: boolean; message: string };
 
@@ -69,17 +70,24 @@ async function applyVerticalTemplate(businessId: string, industry: string): Prom
 
   const items = (template.knowledge_base_items as TemplateItem[] | null) ?? [];
   if (items.length > 0) {
-    const { error: insertError } = await supabase.from("knowledge_items").insert(
-      items.map((item) => ({
-        business_id: businessId,
-        category: item.category,
-        question: item.question,
-        content: item.content,
-        approved_at: null,
-        source: "vertical_template",
-      })),
-    );
+    const { data: inserted, error: insertError } = await supabase
+      .from("knowledge_items")
+      .insert(
+        items.map((item) => ({
+          business_id: businessId,
+          category: item.category,
+          question: item.question,
+          content: item.content,
+          approved_at: null,
+          source: "vertical_template",
+        })),
+      )
+      .select("id, category, content");
     if (insertError) return false;
+    // No-ops if nobody has a WhatsApp number set yet (the common case this
+    // early in onboarding) — same graceful-no-recipient behavior as every
+    // other call site.
+    void notifyPendingKnowledgeItems(businessId, inserted ?? []);
   }
 
   const { data: updated, error: updateError } = await supabase

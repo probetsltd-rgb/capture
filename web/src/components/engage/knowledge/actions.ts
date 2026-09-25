@@ -6,6 +6,7 @@ import { uploadKnowledgeMedia } from "@/lib/media/upload";
 import { extractTextFromPdf, extractKnowledgeItems } from "@/lib/ingest/brochure-extract";
 import { fetchWebsiteText } from "@/lib/ingest/website-extract";
 import { sendNextPendingGapQuestion } from "@/lib/notifications/knowledge-gap-whatsapp";
+import { notifyPendingKnowledgeItems } from "@/lib/notifications/knowledge-review-whatsapp";
 
 export type ActionResult = { ok: boolean; message: string };
 
@@ -226,18 +227,23 @@ export async function uploadBrochure(businessId: string, formData: FormData): Pr
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.from("knowledge_items").insert(
-    items.map((item) => ({
-      business_id: businessId,
-      category: item.category,
-      question: null,
-      content: item.content,
-      media_url: null,
-      approved_at: null, // pending review — same gate as vertical-template suggestions
-      source: "document",
-    })),
-  );
+  const { data: inserted, error } = await supabase
+    .from("knowledge_items")
+    .insert(
+      items.map((item) => ({
+        business_id: businessId,
+        category: item.category,
+        question: null,
+        content: item.content,
+        media_url: null,
+        approved_at: null, // pending review — same gate as vertical-template suggestions
+        source: "document",
+      })),
+    )
+    .select("id, category, content");
   if (error) return { ok: false, message: "Could not save — check you have access to this business." };
+
+  void notifyPendingKnowledgeItems(businessId, inserted ?? []);
 
   revalidateKnowledgePaths(businessId);
   return {
@@ -268,18 +274,23 @@ export async function extractKnowledgeFromWebsite(businessId: string, url: strin
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.from("knowledge_items").insert(
-    items.map((item) => ({
-      business_id: businessId,
-      category: item.category,
-      question: null,
-      content: item.content,
-      media_url: null,
-      approved_at: null, // pending review — same gate as every other extracted source
-      source: "website",
-    })),
-  );
+  const { data: inserted, error } = await supabase
+    .from("knowledge_items")
+    .insert(
+      items.map((item) => ({
+        business_id: businessId,
+        category: item.category,
+        question: null,
+        content: item.content,
+        media_url: null,
+        approved_at: null, // pending review — same gate as every other extracted source
+        source: "website",
+      })),
+    )
+    .select("id, category, content");
   if (error) return { ok: false, message: "Could not save — check you have access to this business." };
+
+  void notifyPendingKnowledgeItems(businessId, inserted ?? []);
 
   revalidateKnowledgePaths(businessId);
   return {

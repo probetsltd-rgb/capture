@@ -5,8 +5,9 @@ import { getConnectionByPhoneNumberId, findOrCreateConversationForInboundMessage
 import { sendMessage, sendMediaMessage, inferMediaType } from "@/lib/channels/whatsapp-api";
 import { handleInboundMessage, takeConversation } from "@/lib/prevent/process";
 import { sendHumanReply } from "@/lib/prevent/human-reply";
-import { resolveWhatsAppReplyRoute, resolveHandlerEmailByWhatsAppNumber, resolveKnowledgeGapQuestionRoute } from "@/lib/notifications/whatsapp-reply-routing";
+import { resolveWhatsAppReplyRoute, resolveHandlerEmailByWhatsAppNumber, resolveKnowledgeGapQuestionRoute, resolveKnowledgeReviewDigest } from "@/lib/notifications/whatsapp-reply-routing";
 import { handleGapQuestionWhatsAppReply } from "@/lib/notifications/knowledge-gap-whatsapp";
+import { handleKnowledgeReviewDigestReply } from "@/lib/notifications/knowledge-review-whatsapp";
 
 // WhatsApp Cloud API webhook receiver. Deliberately its own route, not a
 // branch inside the Instagram one — the payload shape is genuinely
@@ -188,6 +189,16 @@ async function processOneMessage(value: WhatsAppValue, message: WhatsAppMessage)
   const gapQuestionRoute = await resolveKnowledgeGapQuestionRoute(message.context?.id, message.from);
   if (gapQuestionRoute) {
     await handleGapQuestionWhatsAppReply(gapQuestionRoute.businessId, gapQuestionRoute.knowledgeGapQuestionId, message.text.body, message.from);
+    return;
+  }
+
+  // "Update the knowledge base via WhatsApp" flow 2 (scoped in chat
+  // 2026-09-25) — a reply to a knowledge-review digest, same
+  // checked-before-conversation-creation placement as the other two route
+  // checks above.
+  const reviewDigest = await resolveKnowledgeReviewDigest(message.context?.id, message.from);
+  if (reviewDigest) {
+    await handleKnowledgeReviewDigestReply(reviewDigest.businessId, reviewDigest.itemIds, message.text.body, message.from);
     return;
   }
 

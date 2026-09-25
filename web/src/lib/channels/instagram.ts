@@ -7,6 +7,7 @@ import { extractKnowledgeItems, extractKnowledgeGapQuestions } from "@/lib/inges
 import { redactPii } from "@/lib/classification/redact";
 import { notifyChannelConnectionChange } from "@/lib/notifications/channel-connection";
 import { sendNextPendingGapQuestion } from "@/lib/notifications/knowledge-gap-whatsapp";
+import { notifyPendingKnowledgeItems } from "@/lib/notifications/knowledge-review-whatsapp";
 
 // channel_connections has zero RLS policies for `authenticated` — see the
 // migration's header comment. All reads/writes go through the service-role
@@ -396,17 +397,21 @@ async function seedKnowledgeFromHistory(
   ]);
 
   if (items && items.length > 0) {
-    await supabase.from("knowledge_items").insert(
-      items.map((item) => ({
-        business_id: businessId,
-        category: item.category,
-        question: null,
-        content: item.content,
-        media_url: null,
-        approved_at: null, // pending review, same as brochure/manual items
-        source: "instagram_import",
-      })),
-    );
+    const { data: inserted } = await supabase
+      .from("knowledge_items")
+      .insert(
+        items.map((item) => ({
+          business_id: businessId,
+          category: item.category,
+          question: null,
+          content: item.content,
+          media_url: null,
+          approved_at: null, // pending review, same as brochure/manual items
+          source: "instagram_import",
+        })),
+      )
+      .select("id, category, content");
+    void notifyPendingKnowledgeItems(businessId, inserted ?? []);
   }
 
   // Founder request 2026-08-26: alongside what the AI extracted, also ask

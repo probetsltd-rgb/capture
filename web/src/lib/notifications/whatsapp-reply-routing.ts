@@ -142,6 +142,31 @@ export async function resolveKnowledgeGapQuestionRoute(
   return { businessId: route.business_id, knowledgeGapQuestionId: route.knowledge_gap_question_id };
 }
 
+// Sibling to resolveKnowledgeGapQuestionRoute above, for flow 2 of
+// "update the knowledge base via WhatsApp" (scoped in chat 2026-09-25) —
+// a digest reply like "approve 1,3" needs the whole ordered item list a
+// specific digest send carried, not a single id, hence item_ids on
+// knowledge_review_digests rather than one row per item. Same
+// recipient-match security property as every other route resolver here.
+export type ResolvedKnowledgeReviewDigest = { businessId: string; itemIds: string[] };
+
+export async function resolveKnowledgeReviewDigest(
+  contextMessageId: string | undefined,
+  fromWaId: string,
+): Promise<ResolvedKnowledgeReviewDigest | null> {
+  if (!contextMessageId) return null;
+
+  const supabase = createServiceRoleClient();
+  const { data: digest } = await supabase
+    .from("knowledge_review_digests")
+    .select("business_id, item_ids, recipient_wa_id")
+    .eq("whatsapp_message_id", contextMessageId)
+    .maybeSingle();
+  if (!digest || digest.recipient_wa_id !== normalizeWaId(fromWaId)) return null;
+
+  return { businessId: digest.business_id, itemIds: digest.item_ids as string[] };
+}
+
 // Reverse of handler-notification.ts's own lookup (which goes email ->
 // whatsapp_number to find where to send) — this goes whatsapp_number ->
 // email, needed so a routed reply can be attributed to (and the

@@ -7,6 +7,7 @@ import { handleInboundMessage, takeConversation, releaseToAI, type InboundResult
 import { sendHumanReply } from "@/lib/prevent/human-reply";
 import { extractKnowledgeItems } from "@/lib/ingest/brochure-extract";
 import { redactPii } from "@/lib/classification/redact";
+import { notifyPendingKnowledgeItems } from "@/lib/notifications/knowledge-review-whatsapp";
 
 export type SimulateResult = { ok: boolean; message: string };
 
@@ -235,17 +236,22 @@ async function extractKnowledgeFromTeamReplies(
   const items = await extractKnowledgeItems(replies.join("\n\n"), "conversation_history");
   if (!items || items.length === 0) return;
 
-  await supabase.from("knowledge_items").insert(
-    items.map((item) => ({
-      business_id: businessId,
-      category: item.category,
-      question: null,
-      content: item.content,
-      media_url: null,
-      approved_at: null, // pending review, same as brochure/historical items
-      source: "conversation_close",
-    })),
-  );
+  const { data: inserted } = await supabase
+    .from("knowledge_items")
+    .insert(
+      items.map((item) => ({
+        business_id: businessId,
+        category: item.category,
+        question: null,
+        content: item.content,
+        media_url: null,
+        approved_at: null, // pending review, same as brochure/historical items
+        source: "conversation_close",
+      })),
+    )
+    .select("id, category, content");
+
+  void notifyPendingKnowledgeItems(businessId, inserted ?? []);
 }
 
 export type ConversationMessage = { sender_type: string; body: string | null; sent_at: string };
