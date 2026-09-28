@@ -84,7 +84,7 @@ export default async function Home() {
   const engageTiers = groupEngagePlansByTier(engagePlans);
 
   // Mirrors only what's actually visible on this page (name, hero
-  // description, the 7-day free trial, and now the real live tier prices
+  // description, the 14-day free trial, and now the real live tier prices
   // rendered in the pricing section below) — structured data must match
   // on-page content, not assert anything the page itself doesn't say. Built
   // from the same `engagePlans` fetch as the pricing cards so the two can
@@ -98,7 +98,7 @@ export default async function Home() {
     description:
       "Engage responds instantly to enquiries wherever they come in, qualifies them, and escalates anything sensitive to a person, while keeping every conversation moving toward an outcome.",
     offers: [
-      { "@type": "Offer", description: "7-day free trial", priceCurrency: "NGN", price: "0" },
+      { "@type": "Offer", description: "14-day free trial", priceCurrency: "NGN", price: "0" },
       ...engagePlans.map((plan) => ({
         "@type": "Offer",
         name: `${plan.display_name} (${plan.billing_interval})`,
@@ -144,7 +144,7 @@ export default async function Home() {
                 </a>
               </div>
               <p className="meta" style={{ marginTop: "var(--s5)" }}>
-                Instagram and WhatsApp, both live. Free for 7 days.
+                Instagram and WhatsApp, both live. Free for 14 days.
               </p>
             </div>
 
@@ -259,7 +259,7 @@ export default async function Home() {
                 Simple pricing to start.
               </h2>
               <p className="body" style={{ marginTop: "var(--s3)", maxWidth: "56ch" }}>
-                Instagram and WhatsApp both included. Try any tier free for 7 days — no card needed.
+                Instagram and WhatsApp both included. Try any tier free for 14 days — no card needed.
               </p>
 
               <div
@@ -332,19 +332,19 @@ export default async function Home() {
           </section>
         )}
 
-        {/* ---------------------------------------------- seven-day proof --- */}
+        {/* ---------------------------------------------- fourteen-day proof --- */}
         <section className="band band--ruled">
           <div className="shell split">
             <div className="split__copy" data-reveal>
               <div className="step">
-                <span>Seven-day proof</span>
+                <span>Fourteen-day proof</span>
                 <span className="step__line" />
               </div>
               <h2 className="h2">See it work before you commit to it.</h2>
               <p className="body" style={{ marginTop: "var(--s4)" }}>
                 Connect Instagram and Engage builds a baseline from your last 30 days — real
                 conversations, real gaps, not a guess. WhatsApp connects too, starting fresh from
-                day one. Five days into your trial, you get a progress report comparing what
+                day one. Ten days into your trial, you get a progress report comparing what
                 changed.
               </p>
               <p className="body" style={{ marginTop: "var(--s4)" }}>
@@ -355,7 +355,7 @@ export default async function Home() {
             <div className="split__surface" data-reveal data-reveal-delay="120">
               <div className="surface">
                 <div className="surface__bar">
-                  <span className="surface__title">Day 5 of 7</span>
+                  <span className="surface__title">Day 10 of 14</span>
                   <span className="badge-demo">Illustrative</span>
                 </div>
                 <div className="panel__body">
@@ -380,7 +380,7 @@ export default async function Home() {
                 </div>
               </div>
               <p className="meta" style={{ marginTop: "var(--s3)" }}>
-                2 days left in your trial.
+                4 days left in your trial.
               </p>
             </div>
           </div>
@@ -430,7 +430,7 @@ export default async function Home() {
           <div className="shell cta" data-reveal>
             <h2 className="h2">You already have the enquiries. Stop losing them.</h2>
             <p className="lede" style={{ marginTop: "var(--s4)" }}>
-              Try Engage free for 7 days — no card needed.
+              Try Engage free for 14 days — no card needed.
             </p>
             <div className="row" style={{ marginTop: "var(--s6)", gap: "var(--s4)" }}>
               <Link href="/signup?intent=engage" className="btn btn--primary">

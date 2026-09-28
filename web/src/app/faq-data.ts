@@ -24,7 +24,7 @@ export const HOME_FAQS: FaqItem[] = [
   {
     question: "What happens when my free trial ends?",
     answer:
-      "No card is collected upfront, so nothing is charged automatically. If you haven't picked a plan by the end of your 7 days, Engage stops auto-replying and new messages wait for your team instead — nothing is lost, it just needs a human until you subscribe.",
+      "No card is collected upfront, so nothing is charged automatically. If you haven't picked a plan by the end of your 14 days, Engage stops auto-replying and new messages wait for your team instead — nothing is lost, it just needs a human until you subscribe.",
   },
   {
     question: "What happens when Engage doesn't know the answer?",

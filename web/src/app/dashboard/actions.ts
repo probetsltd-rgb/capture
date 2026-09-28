@@ -57,7 +57,7 @@ export async function activateProduct(businessId: string): Promise<ActionResult>
   // turn Engage on. trial_days lives in app_settings (admin-editable, not
   // hardcoded) so the trial length can be tuned without a redeploy.
   const { data: setting } = await supabase.from("app_settings").select("value").eq("key", "trial_days").maybeSingle();
-  const trialDays = Number(setting?.value ?? 7);
+  const trialDays = Number(setting?.value ?? 14);
   const trialEnds = new Date(now.getTime() + trialDays * 24 * 60 * 60 * 1000);
   const update = {
     prevent_activated_at: now.toISOString(),

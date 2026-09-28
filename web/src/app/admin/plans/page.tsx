@@ -30,7 +30,7 @@ export default async function AdminPlansPage() {
 
       <section style={{ margin: "2rem 0" }}>
         <h2>Trial</h2>
-        <TrialDaysForm trialDays={Number(trialSetting?.value ?? 7)} />
+        <TrialDaysForm trialDays={Number(trialSetting?.value ?? 14)} />
       </section>
 
       <section>

@@ -11,7 +11,7 @@ import { EmailCodeForm } from "@/components/EmailCodeForm";
 // see onboarding/actions.ts.
 const INTENT_COPY: Record<string, { title: string; body: string }> = {
   engage: {
-    title: "Start your 7-day Engage trial",
+    title: "Start your 14-day Engage trial",
     body: "We'll email you a 6-digit code — no password, no card needed.",
   },
   recover: {
