@@ -83,13 +83,6 @@ export async function POST(request: NextRequest) {
     return new Response("EVENT_RECEIVED", { status: 200 });
   }
 
-  // Temporary diagnostic (2026-08-15): a real test message produced zero
-  // errors and zero DB writes, meaning some guard in processOneMessage is
-  // silently no-op'ing on a real event without ever explaining why. Every
-  // prior mystery this session got solved by logging real payloads instead
-  // of guessing at their shape — same approach here.
-  console.log("Instagram webhook payload received:", JSON.stringify(payload));
-
   after(() => processEvents(payload).catch((err) => console.error("Instagram webhook processing failed", err)));
 
   return new Response("EVENT_RECEIVED", { status: 200 });

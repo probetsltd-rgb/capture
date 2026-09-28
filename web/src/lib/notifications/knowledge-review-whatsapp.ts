@@ -125,8 +125,15 @@ export async function notifyPendingKnowledgeItems(businessId: string, insertedIt
   }
 }
 
-const APPROVE_ALL_RE = /^approve\s+all$/i;
-const APPROVE_SOME_RE = /^approve\s+([\d,\s]+)$/i;
+// Audit finding 2026-09-27: the original regexes required exactly one
+// space after "approve" and no trailing character at all — "approve1,3",
+// "approve 1,3." and "approve 1,3!" (all things a phone keyboard routinely
+// produces via autocorrect/auto-punctuation) silently failed to parse,
+// falling through to the same generic hint with no indication of why.
+// Trailing "."/"!" are stripped before matching, and the space after
+// "approve" is now optional.
+const APPROVE_ALL_RE = /^approve\s*all$/i;
+const APPROVE_SOME_RE = /^approve\s*([\d,\s]+)$/i;
 
 // Called by the WhatsApp webhook once resolveKnowledgeReviewDigestRoute
 // matches an inbound reply. No reject/delete path via WhatsApp by design
@@ -141,7 +148,9 @@ export async function handleKnowledgeReviewDigestReply(
   recipientWaId: string,
 ): Promise<void> {
   const supabase = createServiceRoleClient();
-  const trimmed = replyText.trim();
+  // Strips trailing "."/"!" (auto-punctuation) before matching — see the
+  // regexes' own comment above.
+  const trimmed = replyText.trim().replace(/[.!]+$/, "").trim();
 
   let ackText: string;
   let targetIds: string[] = [];

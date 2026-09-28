@@ -13,7 +13,7 @@ import { getSiteUrl } from "@/lib/site-url";
 
 // All actions here run through the AUTHENTICATED client — RLS
 // (business_members/platform_admins) governs access, same discipline as
-// admin/recover and admin/prevent's actions. No admin-only assumption.
+// admin/recover and admin/engage's actions. No admin-only assumption.
 //
 // Note on error handling throughout this file: a PostgREST UPDATE whose
 // rows are filtered out by an RLS USING predicate returns **no error** and

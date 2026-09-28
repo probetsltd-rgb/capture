@@ -168,40 +168,75 @@ export async function handleGapQuestionWhatsAppReply(
   // Already resolved (answered on the dashboard, a duplicate webhook
   // redelivery, or a second reply after the first already went through) —
   // idempotent no-op, same discipline as dismissKnowledgeGapQuestion's
-  // `.eq("status", "pending")` guard.
+  // `.eq("status", "pending")` guard. The plain SELECT above is only a
+  // fast-path check for this case — the real, race-safe guard is the
+  // `.eq("status", "pending")` on each UPDATE below, whose returned row
+  // (or lack of one) is what actually decides the outcome, since Meta's
+  // at-least-once webhook delivery means this whole function can run
+  // twice concurrently for the same reply (audit finding 2026-09-27: the
+  // original code read status, then inserted, then updated status — two
+  // redeliveries could both pass the read before either wrote, producing
+  // two knowledge_items rows for one answer).
   if (!question || question.status !== "pending") {
     ackText = "That question isn't open anymore — thanks anyway!";
-  } else if (trimmed.toUpperCase() === "SKIP") {
-    await supabase.from("knowledge_gap_questions").update({ status: "dismissed" }).eq("id", question.id);
-    void sendNextPendingGapQuestion(businessId);
-    ackText = "Skipped.";
+  } else if (trimmed.replace(/[.!]+$/, "").trim().toUpperCase() === "SKIP") {
+    const { data: dismissed } = await supabase
+      .from("knowledge_gap_questions")
+      .update({ status: "dismissed" })
+      .eq("id", question.id)
+      .eq("status", "pending")
+      .select("id")
+      .maybeSingle();
+    if (dismissed) {
+      void sendNextPendingGapQuestion(businessId);
+      ackText = "Skipped.";
+    } else {
+      ackText = "That question isn't open anymore — thanks anyway!";
+    }
   } else if (!trimmed) {
     ackText = `Please reply with an answer to: "${question.question}" — or reply SKIP.`;
   } else {
-    const { data: newItem, error: insertError } = await supabase
-      .from("knowledge_items")
-      .insert({
-        business_id: businessId,
-        category: question.category,
-        question: question.question,
-        content: trimmed,
-        media_url: null,
-        approved_at: new Date().toISOString(),
-        source: "whatsapp_gap_answer",
-      })
-      .select("id")
-      .single();
+    // Atomically claim the question first — the mutual-exclusion gate — and
+    // only insert the knowledge_items row if we actually won the claim.
+    // This can leave a question marked "answered" with no
+    // resulting_knowledge_item_id if the insert below fails (rare: only a
+    // real DB error, content is already validated non-empty), which is a
+    // deliberately lesser, self-evident tradeoff against the silent
+    // duplicate-item bug this closes.
+    const { data: claimed } = await supabase
+      .from("knowledge_gap_questions")
+      .update({ status: "answered", answered_at: new Date().toISOString() })
+      .eq("id", question.id)
+      .eq("business_id", businessId)
+      .eq("status", "pending")
+      .select("id, category, question")
+      .maybeSingle();
 
-    if (insertError || !newItem) {
-      console.error("Failed to save gap-question WhatsApp answer", { businessId, knowledgeGapQuestionId, insertError });
-      ackText = "Sorry, that didn't save — please try again.";
+    if (!claimed) {
+      ackText = "That question isn't open anymore — thanks anyway!";
     } else {
-      await supabase
-        .from("knowledge_gap_questions")
-        .update({ status: "answered", answered_at: new Date().toISOString(), resulting_knowledge_item_id: newItem.id })
-        .eq("id", question.id);
+      const { data: newItem, error: insertError } = await supabase
+        .from("knowledge_items")
+        .insert({
+          business_id: businessId,
+          category: claimed.category,
+          question: claimed.question,
+          content: trimmed,
+          media_url: null,
+          approved_at: new Date().toISOString(),
+          source: "whatsapp_gap_answer",
+        })
+        .select("id")
+        .single();
+
+      if (insertError || !newItem) {
+        console.error("Failed to save gap-question WhatsApp answer", { businessId, knowledgeGapQuestionId, insertError });
+        ackText = "Sorry, that didn't save — please try again.";
+      } else {
+        await supabase.from("knowledge_gap_questions").update({ resulting_knowledge_item_id: newItem.id }).eq("id", claimed.id);
+        ackText = "Got it, saved — the AI can use that right away.";
+      }
       void sendNextPendingGapQuestion(businessId);
-      ackText = "Got it, saved — the AI can use that right away.";
     }
   }
 

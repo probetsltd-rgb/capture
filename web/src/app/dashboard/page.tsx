@@ -104,9 +104,9 @@ export default async function DashboardPage({
       // whatsapp_api + instagram_api + facebook_api — this filter silently
       // excluded real, live Instagram conversations from the "Prevent"
       // stats table below until 2026-08-15 (same bug independently found
-      // and fixed the same day on /admin/page.tsx and
-      // /admin/prevent/[businessId]/page.tsx) — facebook_api added here
-      // from day one this time.
+      // and fixed the same day on /admin/page.tsx and the same view
+      // underlying /admin/engage/[businessId] (renamed 2026-08-15 from
+      // /admin/prevent) — facebook_api added here from day one this time.
       .in("source", ["whatsapp_api", "instagram_api", "facebook_api"]),
     supabase
       .from("knowledge_items")

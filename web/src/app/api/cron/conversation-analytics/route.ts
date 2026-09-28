@@ -60,7 +60,12 @@ async function generateForBusiness(
     .from("conversations")
     .select("id, qualification, escalation_reason")
     .eq("business_id", businessId)
-    .eq("source", "instagram_api")
+    // Audit finding 2026-09-27: was instagram_api only, silently generating
+    // zero weekly analytics — every week, no error surfaced — for any
+    // paying business connected via WhatsApp or Facebook alone. Matches
+    // the source filter already fixed in dashboard/page.tsx, admin/page.tsx,
+    // and EngageDashboardView.tsx for the same reason.
+    .in("source", ["instagram_api", "whatsapp_api", "facebook_api"])
     .gte("last_message_at", periodStart.toISOString())
     .lte("last_message_at", periodEnd.toISOString());
 

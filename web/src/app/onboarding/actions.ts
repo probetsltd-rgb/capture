@@ -51,7 +51,7 @@ type TemplateItem = { category: string; question: string | null; content: string
  * generic boilerplate from a migration, not something the business
  * confirmed, and the Prevent engine must never state it to a customer as
  * fact. The business approves each item at
- * /admin/prevent/[businessId]/knowledge.
+ * /admin/engage/[businessId]/knowledge.
  *
  * Returns false on any write failure so the caller can tell the user their
  * workspace is only half set up, rather than silently landing them on a

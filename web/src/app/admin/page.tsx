@@ -89,7 +89,8 @@ export default async function AdminPage() {
   // Capture existed. See lib/report/north-star.ts. instagram_api added
   // 2026-08-15 — this filter previously silently excluded real, live
   // Instagram data from the platform-wide North Star number, same bug
-  // found and fixed the same day on /dashboard and /admin/prevent/[id].
+  // found and fixed the same day on /dashboard and /admin/engage/[id]
+  // (renamed 2026-08-15 from /admin/prevent).
   const realBusinessIdSet = new Set(realBusinessIds);
   const preventConvIds = (conversations ?? [])
     .filter(
