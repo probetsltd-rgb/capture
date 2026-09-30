@@ -1,6 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { processInboundMessage, type ConversationHistoryMessage } from "./engine";
+import { processInboundMessage, generateCampaignAcknowledgment, type ConversationHistoryMessage } from "./engine";
+import { detectBusinessEscalationKeyword, detectCampaignKeyword, type CampaignKeywordConfig } from "./deterministic-triggers";
 import { evaluateSafeResponseGate } from "./safe-response-gate";
 import { sendEscalationNotification } from "@/lib/notifications/escalation-email";
 import { sendEscalationWhatsApp } from "@/lib/notifications/escalation-whatsapp";
@@ -269,7 +270,7 @@ async function processConversationMessage(
   // with generic boilerplate no business ever confirmed. Answering from an
   // unapproved row would break the one guarantee Prevent makes — that every
   // statement to a customer came from knowledge the business approved.
-  const [{ data: knowledge }, { data: business }, { data: convForGreeting }, { count: customerMessageCount }, { data: recentMessagesDesc }] =
+  const [{ data: knowledge }, { data: business }, { data: convForGreeting }, { count: customerMessageCount }, { data: recentMessagesDesc }, { data: campaignKeywordRows }] =
     await Promise.all([
       supabase
         .from("knowledge_items")
@@ -300,8 +301,20 @@ async function processConversationMessage(
         .eq("conversation_id", conversationId)
         .order("sent_at", { ascending: false })
         .limit(HISTORY_MESSAGE_LIMIT),
+      // Campaign keyword triggers (scoped in chat 2026-09-30) — fetched
+      // regardless of isFirstMessage (computed below, needs this in scope)
+      // rather than conditionally, since it's one cheap indexed query and
+      // conditioning it would need isFirstMessage computed before this
+      // Promise.all, adding a serial round-trip ahead of it for no real
+      // benefit.
+      supabase.from("campaign_keywords").select("keyword, campaign_name, qualifying_prompt").eq("business_id", businessId),
     ]);
   const extraEscalationKeywords = (business?.escalation_keywords as string[] | null) ?? [];
+  const campaignKeywords: CampaignKeywordConfig[] = (campaignKeywordRows ?? []).map((r) => ({
+    keyword: r.keyword as string,
+    campaignName: r.campaign_name as string,
+    qualifyingPrompt: r.qualifying_prompt as string | null,
+  }));
   const knowledgeBaseConfirmedCompleteAt = (business?.knowledge_base_confirmed_complete_at as string | null) ?? null;
   const { data: customerForGreeting } = convForGreeting?.customer_id
     ? await supabase.from("customers").select("name").eq("id", convForGreeting.customer_id).maybeSingle()
@@ -359,15 +372,36 @@ async function processConversationMessage(
 
   await supabase.from("conversations").update({ state: "ai_handling" }).eq("id", conversationId);
 
-  const result = await processInboundMessage(
-    messageBody,
-    knowledge ?? [],
-    extraEscalationKeywords,
-    knowledgeBaseConfirmedCompleteAt,
-    customerName,
-    isFirstMessage,
-    history,
-  );
+  // Campaign keyword triggers (scoped in chat 2026-09-30): checked here,
+  // before ever calling processInboundMessage, rather than inside it — a
+  // match takes a genuinely different path (generateCampaignAcknowledgment,
+  // no approved-knowledge grounding at all) rather than an early-return
+  // within the normal engine call. Escalation keywords are checked first
+  // and win on overlap: if a business (by mistake or intent) puts the same
+  // word in both lists, the safer interpretation — escalate — takes
+  // priority over starting a campaign flow. detectBusinessEscalationKeyword
+  // is cheap and side-effect-free, so re-running it here (it also runs
+  // inside processInboundMessage on the normal path below) costs nothing.
+  const campaignMatch =
+    isFirstMessage && !detectBusinessEscalationKeyword(messageBody, extraEscalationKeywords)
+      ? detectCampaignKeyword(messageBody, campaignKeywords)
+      : null;
+
+  if (campaignMatch) {
+    await supabase.from("conversations").update({ campaign_source: campaignMatch.campaignName }).eq("id", conversationId);
+  }
+
+  const result = campaignMatch
+    ? await generateCampaignAcknowledgment(campaignMatch, customerName)
+    : await processInboundMessage(
+        messageBody,
+        knowledge ?? [],
+        extraEscalationKeywords,
+        knowledgeBaseConfirmedCompleteAt,
+        customerName,
+        isFirstMessage,
+        history,
+      );
 
   // Re-check immediately before committing — this is the actual kill
   // switch, not the pre-check above (which only prevents starting new work

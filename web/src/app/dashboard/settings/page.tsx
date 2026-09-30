@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getOwnBusinessId } from "@/lib/business-membership";
 import { MAX_AUTOMATIONS_PER_OPPORTUNITY } from "@/lib/recover/rules";
 import { RulesForm } from "./RulesForm";
+import { CampaignKeywordsForm } from "./CampaignKeywordsForm";
 import { NotificationPhoneForm } from "./NotificationPhoneForm";
 import { DeleteInstagramDataButton } from "../DeleteInstagramDataButton";
 import { ResetConversationHistoryButton } from "../ResetConversationHistoryButton";
@@ -24,11 +25,18 @@ export default async function DashboardSettingsPage() {
     .eq("user_id", userId)
     .maybeSingle();
 
-  const { data: business } = await supabase
-    .from("businesses")
-    .select("id, name, max_recover_followups, escalation_keywords")
-    .eq("id", businessId)
-    .maybeSingle();
+  const [{ data: business }, { data: campaignKeywords }] = await Promise.all([
+    supabase
+      .from("businesses")
+      .select("id, name, max_recover_followups, escalation_keywords")
+      .eq("id", businessId)
+      .maybeSingle(),
+    supabase
+      .from("campaign_keywords")
+      .select("id, keyword, campaign_name, qualifying_prompt")
+      .eq("business_id", businessId)
+      .order("created_at", { ascending: false }),
+  ]);
 
   if (!business) redirect("/onboarding");
 
@@ -47,6 +55,14 @@ export default async function DashboardSettingsPage() {
           escalationKeywords={(business.escalation_keywords as string[] | null) ?? []}
           platformMaxRecoverFollowups={MAX_AUTOMATIONS_PER_OPPORTUNITY}
         />
+      </section>
+
+      <section style={{ marginTop: "var(--s8)" }}>
+        <h2>Campaign keywords</h2>
+        <p className="meta">
+          <Link href="/dashboard/engage/campaigns">See how your campaigns are performing →</Link>
+        </p>
+        <CampaignKeywordsForm businessId={businessId} campaignKeywords={campaignKeywords ?? []} />
       </section>
 
       <section style={{ marginTop: "var(--s8)" }}>

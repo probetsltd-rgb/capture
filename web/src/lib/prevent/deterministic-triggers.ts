@@ -29,3 +29,29 @@ export function detectBusinessEscalationKeyword(message: string, extraKeywords: 
   const lower = message.toLowerCase();
   return extraKeywords.find((kw) => kw.trim() && lower.includes(kw.trim().toLowerCase())) ?? null;
 }
+
+// Campaign keyword triggers (scoped in chat 2026-09-30) — a business
+// running an ad campaign ("DM us the word CAPTURE") registers a keyword so
+// that exact trigger is recognized as fresh interest, not silently
+// escalated on as an ungrounded tier-D message (engine.ts's normal
+// behavior for a one-word message with no knowledge to ground it).
+// Deliberately STRICT near-exact matching, unlike
+// detectBusinessEscalationKeyword's substring-anywhere match — a customer
+// asking "can you capture that in a photo" must never misfire this. The
+// message, after trimming and stripping only leading/trailing punctuation,
+// must equal the keyword exactly; extra words anywhere disqualify it.
+export type CampaignKeywordConfig = { keyword: string; campaignName: string; qualifyingPrompt: string | null };
+
+function normalizeForCampaignMatch(s: string): string {
+  return s
+    .trim()
+    .toLowerCase()
+    .replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, "");
+}
+
+export function detectCampaignKeyword(message: string, campaignKeywords: CampaignKeywordConfig[]): CampaignKeywordConfig | null {
+  if (campaignKeywords.length === 0) return null;
+  const normalizedMessage = normalizeForCampaignMatch(message);
+  if (!normalizedMessage) return null;
+  return campaignKeywords.find((c) => normalizeForCampaignMatch(c.keyword) === normalizedMessage) ?? null;
+}

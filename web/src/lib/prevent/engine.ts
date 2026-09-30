@@ -1,7 +1,7 @@
 import "server-only";
 import { generateObject, NoObjectGeneratedError } from "ai";
 import { engineResponseSchema, type EngineResponse } from "./schema";
-import { detectExplicitHumanRequest, detectBusinessEscalationKeyword } from "./deterministic-triggers";
+import { detectExplicitHumanRequest, detectBusinessEscalationKeyword, type CampaignKeywordConfig } from "./deterministic-triggers";
 import { evaluateSafeResponseGate } from "./safe-response-gate";
 
 const MODEL = process.env.PREVENT_MODEL || "anthropic/claude-haiku-4.5";
@@ -174,6 +174,64 @@ export async function processInboundMessage(
     // media_url gets caught here too, not just trusted through.
     const validMediaUrls = new Set(knowledgeItems.map((i) => i.media_url).filter((u): u is string => !!u));
     const gate = evaluateSafeResponseGate(object, validMediaUrls);
+    if (!gate.safe) {
+      return { ...object, response: null, media_url: null, escalate: true, escalation_reason: gate.reason };
+    }
+    return { ...object, media_url: gate.mediaUrl };
+  } catch (error) {
+    if (NoObjectGeneratedError.isInstance(error)) return null;
+    throw error;
+  }
+}
+
+// Campaign keyword triggers (scoped in chat 2026-09-30) — a distinct
+// system prompt, not a branch inside SYSTEM_PROMPT above: that prompt's
+// entire discipline is "only answer using approved knowledge," and a
+// campaign trigger has no knowledge to answer from — it's a greeting +
+// qualifying question, not a claim about the business. Called by
+// process.ts INSTEAD OF processInboundMessage when
+// detectCampaignKeyword() matches the customer's first message (checked
+// there, before this is ever reached, so this function trusts that the
+// match already happened deterministically and strictly — see
+// deterministic-triggers.ts's own comment on why it's near-exact, not
+// substring, matching).
+const CAMPAIGN_SYSTEM_PROMPT = `You are Capture's Engage response engine, writing a customer's very first reply on behalf of a business running a WhatsApp/Instagram enquiry channel.
+
+The customer's entire message was just the trigger word "{{KEYWORD}}" — nothing else. This means they're responding to the business's "{{CAMPAIGN_NAME}}" marketing campaign, showing fresh interest, not asking a specific question yet.
+
+Write a short, warm, natural first reply: thank them for reaching out, and ask what they're looking for so the business can help.{{QUALIFYING_PROMPT}}
+
+Rules:
+1. Do not claim any specific fact, price, or product detail — you have no approved knowledge for this reply, only acknowledge interest and ask a question.
+2. Set escalate to false, intent to "general_information", answerability to "A", media_url to null, and leave every qualification field null — nothing has been stated yet.
+3. No emojis, ever. Never use a double hyphen ("--"). Write like a real person replying on their phone, short and plain, not a formal or corporate tone.
+4. {{GREETING}}`;
+
+/**
+ * Generates the warm, non-escalating acknowledgment for a matched campaign
+ * keyword. Reuses the same schema/gate/error-handling discipline as
+ * processInboundMessage above — a schema-non-conformant model output still
+ * returns null (never a guessed response), and the safe-response gate is
+ * still re-run as defense in depth even though the prompt hard-instructs
+ * escalate:false.
+ */
+export async function generateCampaignAcknowledgment(
+  match: CampaignKeywordConfig,
+  customerName: string | null,
+): Promise<EngineResponse | null> {
+  const system = CAMPAIGN_SYSTEM_PROMPT.replace("{{KEYWORD}}", match.keyword)
+    .replace("{{CAMPAIGN_NAME}}", match.campaignName)
+    .replace("{{QUALIFYING_PROMPT}}", match.qualifyingPrompt ? ` Specifically: ${match.qualifyingPrompt}` : "")
+    .replace("{{GREETING}}", buildGreetingBlock(customerName, true));
+
+  try {
+    const { object } = await generateObject({
+      model: MODEL,
+      schema: engineResponseSchema,
+      system,
+      prompt: `Customer message: ${match.keyword}`,
+    });
+    const gate = evaluateSafeResponseGate(object);
     if (!gate.safe) {
       return { ...object, response: null, media_url: null, escalate: true, escalation_reason: gate.reason };
     }

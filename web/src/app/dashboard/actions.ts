@@ -151,6 +151,83 @@ export async function updateRules(
   return { ok: true, message: "Rules updated." };
 }
 
+// Campaign keyword triggers (scoped in chat 2026-09-30) — a business
+// running an ad campaign ("DM us the word CAPTURE") registers the keyword
+// here so that exact trigger word is recognized as fresh interest (see
+// lib/prevent/deterministic-triggers.ts's detectCampaignKeyword and
+// lib/prevent/engine.ts's generateCampaignAcknowledgment), not silently
+// escalated on with no reply. Same authenticated-client + `.select()`
+// empty-result-is-denial discipline as every other action in this file.
+const MIN_CAMPAIGN_KEYWORD_LENGTH = 2;
+const MAX_CAMPAIGN_KEYWORD_LENGTH = 50;
+const MAX_CAMPAIGN_NAME_LENGTH = 100;
+const MAX_QUALIFYING_PROMPT_LENGTH = 200;
+const MAX_CAMPAIGN_KEYWORDS = 20;
+
+export async function addCampaignKeyword(businessId: string, _prevState: ActionResult, formData: FormData): Promise<ActionResult> {
+  const supabase = await createClient();
+
+  const keyword = String(formData.get("keyword") ?? "").trim();
+  const campaignName = String(formData.get("campaign_name") ?? "").trim();
+  const qualifyingPrompt = String(formData.get("qualifying_prompt") ?? "").trim() || null;
+
+  if (keyword.length < MIN_CAMPAIGN_KEYWORD_LENGTH || keyword.length > MAX_CAMPAIGN_KEYWORD_LENGTH) {
+    return { ok: false, message: `Keyword must be ${MIN_CAMPAIGN_KEYWORD_LENGTH}-${MAX_CAMPAIGN_KEYWORD_LENGTH} characters.` };
+  }
+  if (!campaignName || campaignName.length > MAX_CAMPAIGN_NAME_LENGTH) {
+    return { ok: false, message: `Campaign name is required and must be under ${MAX_CAMPAIGN_NAME_LENGTH} characters.` };
+  }
+  if (qualifyingPrompt && qualifyingPrompt.length > MAX_QUALIFYING_PROMPT_LENGTH) {
+    return { ok: false, message: `Qualifying prompt must be under ${MAX_QUALIFYING_PROMPT_LENGTH} characters.` };
+  }
+
+  const { count } = await supabase
+    .from("campaign_keywords")
+    .select("id", { count: "exact", head: true })
+    .eq("business_id", businessId);
+  if ((count ?? 0) >= MAX_CAMPAIGN_KEYWORDS) {
+    return { ok: false, message: `Please use at most ${MAX_CAMPAIGN_KEYWORDS} campaign keywords.` };
+  }
+
+  const { error } = await supabase.from("campaign_keywords").insert({
+    business_id: businessId,
+    keyword,
+    campaign_name: campaignName,
+    qualifying_prompt: qualifyingPrompt,
+  });
+
+  if (error) {
+    // campaign_keywords_business_keyword_idx — a duplicate keyword
+    // (case-insensitive) for this business, the one write-time failure
+    // mode worth a specific message rather than the generic fallback.
+    if (error.code === "23505") {
+      return { ok: false, message: `"${keyword}" is already a campaign keyword for this business.` };
+    }
+    return { ok: false, message: "Could not save — check you have access to this business." };
+  }
+
+  revalidatePath("/dashboard/settings");
+  return { ok: true, message: "Campaign keyword added." };
+}
+
+export async function deleteCampaignKeyword(businessId: string, keywordId: string): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("campaign_keywords")
+    .delete()
+    .eq("id", keywordId)
+    .eq("business_id", businessId)
+    .select("id");
+
+  if (error) return { ok: false, message: "Could not delete." };
+  if (!data || data.length === 0) {
+    return { ok: false, message: "Could not delete — check you have access to this business." };
+  }
+
+  revalidatePath("/dashboard/settings");
+  return { ok: true, message: "Deleted." };
+}
+
 // channel_connections has zero RLS policies for `authenticated` (see its
 // migration) — ownership has to be verified explicitly here, unlike every
 // other action in this file, before calling the service-role-backed
