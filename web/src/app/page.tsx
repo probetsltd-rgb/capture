@@ -4,7 +4,6 @@ import { ScrollReveal } from "@/components/ScrollReveal";
 import { EngageResponseDemo } from "@/components/EngageResponseDemo";
 import { FaqSection } from "@/components/FaqSection";
 import { buildFaqJsonLd } from "@/lib/seo/faq-jsonld";
-import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { HOME_FAQS } from "./faq-data";
 
 // Engage-first homepage rebuild (Capture_PRD_Addendum_v2.md §2, §28;
@@ -30,65 +29,10 @@ import { HOME_FAQS } from "./faq-data";
 // coloring it that way would be exactly the decorative use the CSS
 // header comment rules out.
 //
-type EngagePlanRow = {
-  id: string;
-  display_name: string;
-  tier: string;
-  billing_interval: "monthly" | "annual";
-  price_kobo: number;
-  message_limit: number | null;
-  escalation_notification_limit: number;
-  has_analytics: boolean;
-};
-
-type EngageTierGroup = { tier: string; displayName: string; monthly?: EngagePlanRow; annual?: EngagePlanRow };
-
-// Static (no toggle) deliberately — this page's job is to communicate
-// pricing and funnel to the free trial, not to transact; actual plan
-// selection happens later at EngagePaywall. Both durations shown
-// together keeps this a plain Server Component, no client-side state
-// needed just to switch a displayed number.
-function groupEngagePlansByTier(plans: EngagePlanRow[]): EngageTierGroup[] {
-  const byTier = new Map<string, EngageTierGroup>();
-  for (const plan of plans) {
-    const entry = byTier.get(plan.tier) ?? { tier: plan.tier, displayName: plan.display_name };
-    if (plan.billing_interval === "annual") entry.annual = plan;
-    else entry.monthly = plan;
-    byTier.set(plan.tier, entry);
-  }
-  return Array.from(byTier.values());
-}
-
-function formatNaira(kobo: number): string {
-  return `₦${(kobo / 100).toLocaleString("en-NG")}`;
-}
-
-// Without this the page prerenders fully static at build time and bakes in
-// whatever `plans` prices existed then — an /admin/plans edit would never
-// reach this page without a redeploy. 5 minutes is a deliberately loose
-// bound: pricing changes are rare, so this trades a little staleness for
-// keeping the homepage cheap/fast to serve, not force-dynamic on every hit.
-export const revalidate = 300;
-
-export default async function Home() {
-  // Public, unauthenticated page — service-role client, same pattern as
-  // report/[token]/page.tsx, so this reads live from the same `plans`
-  // table /admin/plans edits (never a hardcoded, driftable figure) without
-  // needing an RLS change for anonymous access.
-  const supabase = createServiceRoleClient();
-  const { data: plans } = await supabase
-    .from("plans")
-    .select("id, display_name, tier, billing_interval, price_kobo, message_limit, escalation_notification_limit, has_analytics")
-    .order("price_kobo", { ascending: true });
-  const engagePlans = (plans ?? []) as EngagePlanRow[];
-  const engageTiers = groupEngagePlansByTier(engagePlans);
-
+export default function Home() {
   // Mirrors only what's actually visible on this page (name, hero
-  // description, the 14-day free trial, and now the real live tier prices
-  // rendered in the pricing section below) — structured data must match
-  // on-page content, not assert anything the page itself doesn't say. Built
-  // from the same `engagePlans` fetch as the pricing cards so the two can
-  // never diverge.
+  // description, the 14-day free trial) — structured data must match
+  // on-page content, not assert anything the page itself doesn't say.
   const softwareApplicationJsonLd = {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
@@ -99,16 +43,6 @@ export default async function Home() {
       "Engage responds instantly to enquiries wherever they come in, qualifies them, and escalates anything sensitive to a person, while keeping every conversation moving toward an outcome.",
     offers: [
       { "@type": "Offer", description: "14-day free trial", priceCurrency: "NGN", price: "0" },
-      ...engagePlans.map((plan) => ({
-        "@type": "Offer",
-        name: `${plan.display_name} (${plan.billing_interval})`,
-        priceCurrency: "NGN",
-        price: String(plan.price_kobo / 100),
-        priceSpecification: {
-          "@type": "UnitPriceSpecification",
-          billingDuration: plan.billing_interval === "annual" ? "P1Y" : "P1M",
-        },
-      })),
     ],
   };
 
@@ -246,91 +180,6 @@ export default async function Home() {
             </div>
           </div>
         </section>
-
-        {/* -------------------------------------------- engage pricing --- */}
-        {engagePlans.length > 0 && (
-          <section className="band band--ruled band--tint">
-            <div className="shell">
-              <div className="step">
-                <span>Engage pricing</span>
-                <span className="step__line" />
-              </div>
-              <h2 className="h2" data-reveal>
-                Simple pricing to start.
-              </h2>
-              <p className="body" style={{ marginTop: "var(--s3)", maxWidth: "56ch" }}>
-                Instagram and WhatsApp both included. Try any tier free for 14 days — no card needed.
-              </p>
-
-              <div
-                data-reveal
-                data-reveal-delay="80"
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-                  gap: "var(--s5)",
-                  maxWidth: "760px",
-                  marginTop: "var(--s6)",
-                }}
-              >
-                {engageTiers.map((t) => {
-                  const plan = t.monthly ?? t.annual;
-                  if (!plan) return null;
-                  const savings = t.monthly && t.annual ? t.monthly.price_kobo * 12 - t.annual.price_kobo : 0;
-
-                  return (
-                    <div
-                      key={t.tier}
-                      style={{
-                        padding: "var(--s5)",
-                        border: "1px solid var(--rule)",
-                        borderRadius: "var(--radius)",
-                        background: "var(--paper)",
-                      }}
-                    >
-                      <h3 className="h3">{t.displayName}</h3>
-                      {t.monthly && (
-                        <p className="mono" style={{ fontSize: "1.5rem", marginTop: "var(--s2)" }}>
-                          {formatNaira(t.monthly.price_kobo)}
-                          <span className="meta" style={{ fontWeight: 400 }}>
-                            /mo
-                          </span>
-                        </p>
-                      )}
-                      {t.annual && (
-                        <p className="meta" style={{ marginTop: "var(--s1)" }}>
-                          or {formatNaira(t.annual.price_kobo)}/yr
-                          {savings > 0 && ` — save ${formatNaira(savings)} (about 2 months free)`}
-                        </p>
-                      )}
-                      <ul className="meta" style={{ paddingLeft: "1.1rem", marginTop: "var(--s4)" }}>
-                        <li>
-                          {plan.message_limit
-                            ? `${plan.message_limit.toLocaleString()} customer messages handled/mo`
-                            : "Unlimited messages"}
-                        </li>
-                        <li>
-                          {plan.escalation_notification_limit === 1
-                            ? "Escalations go to 1 team member"
-                            : `Escalations reach up to ${plan.escalation_notification_limit} team members`}
-                        </li>
-                        <li>Knowledge-base assist (30-day history review)</li>
-                        {plan.has_analytics && <li>Weekly/monthly conversation analytics</li>}
-                      </ul>
-                      <Link
-                        href="/signup?intent=engage"
-                        className="btn btn--primary btn--block"
-                        style={{ marginTop: "var(--s5)" }}
-                      >
-                        Try Free — no card needed
-                      </Link>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </section>
-        )}
 
         {/* ---------------------------------------------- fourteen-day proof --- */}
         <section className="band band--ruled">

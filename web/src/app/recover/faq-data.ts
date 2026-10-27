@@ -1,7 +1,7 @@
 import type { FaqItem } from "@/lib/seo/faq-jsonld";
 
 // Deliberately no hardcoded prices/tier names here — those are
-// admin-editable and already shown live in the pricing section above this
+// admin-editable and shown live in the pricing section on this page
 // (recover_plans via createServiceRoleClient); a FAQ answer naming a
 // specific figure would go stale the moment a price changes.
 export const RECOVER_FAQS: FaqItem[] = [

@@ -13,10 +13,10 @@ export const metadata: Metadata = {
   alternates: { canonical: "/recover" },
 };
 
-// Public, unauthenticated marketing page — same reasoning as the homepage's
-// pricing section: read live from `recover_plans` via the service-role
-// client so an /admin/recover-plans price edit is never stale here without
-// a redeploy.
+// Public, unauthenticated marketing page — prices are read live from
+// `recover_plans` via the service-role client so an /admin/recover-plans
+// price edit is never stale here without a redeploy. (The homepage no
+// longer shows pricing; this page is the public place Recover prices live.)
 export const revalidate = 300;
 
 type RecoverPlanRow = {
