@@ -149,6 +149,56 @@ export async function addKnowledgeItemsBulk(
   return { ok: true, message: `Added ${lines.length} item${lines.length === 1 ? "" : "s"}.` };
 }
 
+// Edit in place instead of delete-and-re-add. Approval state is deliberately
+// left untouched: an approved item stays approved (a human just wrote the
+// new text, same rule as addKnowledgeItem) and a pending suggestion stays
+// pending until someone clicks Approve — editing is not approving. Same
+// defensive-write discipline as approveKnowledgeItem: an RLS-filtered UPDATE
+// returns no error and zero rows, so success requires `.select()` to return one.
+export async function updateKnowledgeItem(
+  businessId: string,
+  itemId: string,
+  formData: FormData,
+): Promise<ActionResult> {
+  const category = String(formData.get("category") ?? "");
+  const question = String(formData.get("question") ?? "").trim() || null;
+  const content = String(formData.get("content") ?? "").trim();
+  const removeMedia = formData.get("remove_media") === "on";
+  const mediaFile = formData.get("media");
+
+  if (!CATEGORIES.includes(category)) return { ok: false, message: "Choose a category." };
+  if (!content) return { ok: false, message: "Content is required." };
+
+  const update: { category: string; question: string | null; content: string; media_url?: string | null } = {
+    category,
+    question,
+    content,
+  };
+  if (mediaFile instanceof File && mediaFile.size > 0) {
+    const uploadResult = await uploadKnowledgeMedia(businessId, mediaFile);
+    if (!uploadResult.ok) return { ok: false, message: uploadResult.message };
+    update.media_url = uploadResult.url;
+  } else if (removeMedia) {
+    update.media_url = null;
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("knowledge_items")
+    .update(update)
+    .eq("id", itemId)
+    .eq("business_id", businessId)
+    .select("id");
+
+  if (error) return { ok: false, message: "Could not save changes." };
+  if (!data || data.length === 0) {
+    return { ok: false, message: "Could not save — check you have access to this business." };
+  }
+
+  revalidateKnowledgePaths(businessId);
+  return { ok: true, message: "Saved." };
+}
+
 export async function deleteKnowledgeItem(businessId: string, itemId: string): Promise<ActionResult> {
   const supabase = await createClient();
   const { error } = await supabase.from("knowledge_items").delete().eq("id", itemId);

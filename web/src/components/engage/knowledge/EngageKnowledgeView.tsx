@@ -5,6 +5,7 @@ import { BulkAddForm } from "./BulkAddForm";
 import { BrochureUploadForm } from "./BrochureUploadForm";
 import { WebsiteExtractForm } from "./WebsiteExtractForm";
 import { DeleteButton } from "./DeleteButton";
+import { EditButton } from "./EditButton";
 import { ApproveButton } from "./ApproveButton";
 import { CompletenessToggle } from "./CompletenessToggle";
 import { KnowledgeGapQuestions } from "./KnowledgeGapQuestions";
@@ -106,8 +107,8 @@ export async function EngageKnowledgeView({
             <p className="meta">
               These came from an industry starter template, an uploaded document, your website, past
               conversations, or your team&apos;s own replies. They are <strong>suggestions, not facts</strong> —
-              the AI will not use any of them until you confirm each one is correct for your business. Edit is not
-              supported yet: delete anything that&apos;s wrong and add your own version above.
+              the AI will not use any of them until you confirm each one is correct for your business. Use Edit to fix anything
+              that&apos;s wrong before approving it.
             </p>
             <ul style={{ listStyle: "none", padding: 0, marginTop: "var(--s3)" }}>
               {pending.map((item) => (
@@ -118,6 +119,7 @@ export async function EngageKnowledgeView({
                   <span className="meta"> — from {sourceLabel(item.source as string)}</span>
                   <span style={{ display: "inline-flex", gap: "var(--s3)", marginLeft: "var(--s3)" }}>
                     <ApproveButton businessId={businessId} itemId={item.id} />
+                    <EditButton businessId={businessId} item={item} />
                     <DeleteButton businessId={businessId} itemId={item.id} />
                   </span>
                 </li>
@@ -139,7 +141,8 @@ export async function EngageKnowledgeView({
                 {item.content}
                 {item.media_url && <span className="meta"> 📎 media attached</span>}
                 <span className="meta"> — from {sourceLabel(item.source as string)}</span>
-                <span style={{ marginLeft: "var(--s3)" }}>
+                <span style={{ display: "inline-flex", gap: "var(--s3)", marginLeft: "var(--s3)" }}>
+                  <EditButton businessId={businessId} item={item} />
                   <DeleteButton businessId={businessId} itemId={item.id} />
                 </span>
               </li>
