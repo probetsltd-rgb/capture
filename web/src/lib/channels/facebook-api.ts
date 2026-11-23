@@ -170,3 +170,23 @@ export function inferMediaType(url: string): MediaType {
   const path = url.split("?")[0].toLowerCase();
   return VIDEO_EXTENSIONS.some((ext) => path.endsWith(ext)) ? "video" : "image";
 }
+
+// Messenger User Profile — a Page-scoped id's name, via the Page token.
+// UNVERIFIED against a real sender as of 2026-11-23 (the only Facebook
+// traffic so far is synthetic PSIDs); the shape follows Meta's Messenger
+// "User Profile API" docs. Any non-OK response, including a permissions
+// refusal, returns null so the greeting falls back to generic — never an error.
+export async function fetchPsidProfile(
+  pageAccessToken: string,
+  psid: string,
+  signal?: AbortSignal,
+): Promise<{ name: string | null } | null> {
+  const url = new URL(`${GRAPH_BASE}/${psid}`);
+  url.searchParams.set("fields", "name");
+  url.searchParams.set("access_token", pageAccessToken);
+
+  const response = await fetch(url.toString(), { signal });
+  if (!response.ok) return null;
+  const body = (await response.json()) as { name?: string };
+  return { name: body.name ?? null };
+}

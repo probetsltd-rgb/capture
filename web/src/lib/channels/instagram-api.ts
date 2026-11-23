@@ -347,3 +347,24 @@ export function inferMediaType(url: string): MediaType {
   const path = url.split("?")[0].toLowerCase();
   return VIDEO_EXTENSIONS.some((ext) => path.endsWith(ext)) ? "video" : "image";
 }
+
+// Instagram User Profile API — name + username for someone who has messaged
+// the connected account. Verified against real production senders
+// 2026-11-23 (200 with `name`, `username`, `id`; a sender who has since
+// deleted/deactivated their account returns 400 code 100 subcode 2534014
+// "The requested user cannot be found", which callers must treat as "no
+// profile", not a failure).
+export async function fetchSenderProfile(
+  accessToken: string,
+  senderId: string,
+  signal?: AbortSignal,
+): Promise<{ name: string | null; username: string | null } | null> {
+  const url = new URL(`https://graph.instagram.com/v25.0/${senderId}`);
+  url.searchParams.set("fields", "name,username");
+  url.searchParams.set("access_token", accessToken);
+
+  const response = await fetch(url.toString(), { signal });
+  if (!response.ok) return null;
+  const body = (await response.json()) as { name?: string; username?: string };
+  return { name: body.name ?? null, username: body.username ?? null };
+}

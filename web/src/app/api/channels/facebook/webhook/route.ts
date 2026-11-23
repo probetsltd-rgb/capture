@@ -2,8 +2,9 @@ import { after, type NextRequest } from "next/server";
 import crypto from "node:crypto";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { getConnectionByPageId, findOrCreateConversationForInboundMessage } from "@/lib/channels/facebook";
-import { sendMessage, sendMediaMessage, inferMediaType } from "@/lib/channels/facebook-api";
+import { sendMessage, sendMediaMessage, inferMediaType, fetchPsidProfile } from "@/lib/channels/facebook-api";
 import { handleInboundMessage } from "@/lib/prevent/process";
+import { enrichCustomerProfile } from "@/lib/channels/customer-profile";
 
 // Facebook Page Messenger webhook receiver (OUTSTANDINGS.md "Channel
 // roadmap confirmed 2026-09-08"). object: "page", entry[].messaging[] —
@@ -124,7 +125,14 @@ async function processOneMessage(pageId: string, event: MessagingEvent): Promise
     .maybeSingle();
   if (alreadyProcessed) return;
 
-  const { conversationId } = await findOrCreateConversationForInboundMessage(connection.businessId, event.sender.id);
+  const { conversationId, customerId } = await findOrCreateConversationForInboundMessage(connection.businessId, event.sender.id);
+
+  // Same as the Instagram webhook: one best-effort name lookup so the first
+  // reply can greet by name. Never blocks/fails the reply.
+  await enrichCustomerProfile(customerId, async (signal) => {
+    const profile = await fetchPsidProfile(connection.accessToken, event.sender.id, signal);
+    return profile && { name: profile.name, handle: null };
+  });
 
   const result = await handleInboundMessage(
     supabase,

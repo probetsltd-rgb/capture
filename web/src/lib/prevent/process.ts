@@ -1,4 +1,5 @@
 import "server-only";
+import { pickGreetingName } from "@/lib/channels/greeting-name";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { processInboundMessage, generateCampaignAcknowledgment, type ConversationHistoryMessage } from "./engine";
 import { detectBusinessEscalationKeyword, detectCampaignKeyword, type CampaignKeywordConfig } from "./deterministic-triggers";
@@ -233,7 +234,7 @@ async function processConversationMessage(
       if (conv?.assigned_to) {
         await supabase.from("conversations").update({ handler_reminder_sent_at: null }).eq("id", conversationId);
         const { data: customer } = conv.customer_id
-          ? await supabase.from("customers").select("name").eq("id", conv.customer_id).maybeSingle()
+          ? await supabase.from("customers").select("name, handle").eq("id", conv.customer_id).maybeSingle()
           : { data: null };
         await notifyHandler({
           businessId,
@@ -317,9 +318,16 @@ async function processConversationMessage(
   }));
   const knowledgeBaseConfirmedCompleteAt = (business?.knowledge_base_confirmed_complete_at as string | null) ?? null;
   const { data: customerForGreeting } = convForGreeting?.customer_id
-    ? await supabase.from("customers").select("name").eq("id", convForGreeting.customer_id).maybeSingle()
+    ? await supabase.from("customers").select("name, handle").eq("id", convForGreeting.customer_id).maybeSingle()
     : { data: null };
-  const customerName = (customerForGreeting?.name as string | null) ?? null;
+  // Not the raw stored name: a historical-import name is just the Instagram
+  // handle, and a display name may be a brand or emoji. pickGreetingName
+  // returns a first name only when one is plausibly a person's, else null
+  // (generic greeting) — never "Hi lagos_bakes_22".
+  const customerName = pickGreetingName({
+    displayName: customerForGreeting?.name as string | null,
+    handle: customerForGreeting?.handle as string | null,
+  });
   const isFirstMessage = (customerMessageCount ?? 0) <= 1;
   const history: ConversationHistoryMessage[] = (recentMessagesDesc ?? [])
     .slice()
@@ -460,7 +468,7 @@ async function processConversationMessage(
       .eq("id", conversationId)
       .maybeSingle();
     const { data: customer } = conv?.customer_id
-      ? await supabase.from("customers").select("name").eq("id", conv.customer_id).maybeSingle()
+      ? await supabase.from("customers").select("name, handle").eq("id", conv.customer_id).maybeSingle()
       : { data: null };
 
     // Founder decision 2026-08-25: every escalation notifies now — no
@@ -562,7 +570,7 @@ export async function sendHandlerReminder(supabase: SupabaseClient, businessId: 
   if (!latestMessage?.body) return;
 
   const { data: customer } = conv.customer_id
-    ? await supabase.from("customers").select("name").eq("id", conv.customer_id).maybeSingle()
+    ? await supabase.from("customers").select("name, handle").eq("id", conv.customer_id).maybeSingle()
     : { data: null };
 
   await notifyHandler({

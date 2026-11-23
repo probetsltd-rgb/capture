@@ -2,7 +2,8 @@ import { after, type NextRequest } from "next/server";
 import crypto from "node:crypto";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { getConnectionByExternalAccountId, findOrCreateConversationForInboundMessage } from "@/lib/channels/instagram";
-import { sendMessage, sendMediaMessage, inferMediaType } from "@/lib/channels/instagram-api";
+import { sendMessage, sendMediaMessage, inferMediaType, fetchSenderProfile } from "@/lib/channels/instagram-api";
+import { enrichCustomerProfile } from "@/lib/channels/customer-profile";
 import { handleInboundMessage } from "@/lib/prevent/process";
 
 // Instagram webhook receiver (PLANS.md Phase 5.2, Capture_PRD_Addendum_v2.md
@@ -137,7 +138,14 @@ async function processOneMessage(businessAccountId: string, event: MessagingEven
     .maybeSingle();
   if (alreadyProcessed) return;
 
-  const { conversationId } = await findOrCreateConversationForInboundMessage(connection.businessId, event.sender.id);
+  const { conversationId, customerId } = await findOrCreateConversationForInboundMessage(connection.businessId, event.sender.id);
+
+  // Live webhooks carry only an opaque sender id — look the name up once so
+  // the first reply can greet them by it. Never blocks/fails the reply.
+  await enrichCustomerProfile(customerId, async (signal) => {
+    const profile = await fetchSenderProfile(connection.accessToken, event.sender.id, signal);
+    return profile && { name: profile.name, handle: profile.username };
+  });
 
   const result = await handleInboundMessage(
     supabase,
