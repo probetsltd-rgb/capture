@@ -47,10 +47,10 @@ export function BrochureUploadForm({ businessId }: { businessId: string }) {
           }
         >
           <p className="meta">
-            PDF or plain text. The AI reads it and proposes individual knowledge items — nothing is used until
+            PDF, plain text, or a JPG/PNG photo or screenshot (under 5MB). The AI reads it and proposes individual knowledge items — nothing is used until
             you review and approve each one below, same as everything else here.
           </p>
-          <input type="file" name="brochure" accept="application/pdf,text/plain" required />
+          <input type="file" name="brochure" accept="application/pdf,text/plain,image/jpeg,image/png" required />
           {message && <p className={ok ? "notice" : "notice notice--error"}>{message}</p>}
           <span style={{ display: "inline-flex", gap: "var(--s3)" }}>
             <button type="submit" disabled={pending} className="btn btn--primary">

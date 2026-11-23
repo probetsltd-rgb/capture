@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { uploadKnowledgeMedia } from "@/lib/media/upload";
-import { extractTextFromPdf, extractKnowledgeItems } from "@/lib/ingest/brochure-extract";
+import { extractTextFromPdf, extractKnowledgeItems, extractKnowledgeItemsFromImage } from "@/lib/ingest/brochure-extract";
 import { fetchWebsiteText } from "@/lib/ingest/website-extract";
 import { sendNextPendingGapQuestion } from "@/lib/notifications/knowledge-gap-whatsapp";
 import { notifyPendingKnowledgeItems } from "@/lib/notifications/knowledge-review-whatsapp";
@@ -238,6 +238,9 @@ export async function setKnowledgeBaseComplete(businessId: string, complete: boo
 }
 
 const MAX_BROCHURE_BYTES = 15 * 1024 * 1024; // matches Vercel's request-body ceiling with headroom
+// Anthropic's per-image limit is 5MB; a bigger photo would fail at the model
+// with an opaque error, so reject it up front with an actionable message.
+const MAX_BROCHURE_IMAGE_BYTES = 5 * 1024 * 1024;
 
 // Founder request 2026-08-21: a brochure or price list a business already
 // has shouldn't mean re-typing everything by hand. Extracted items land
@@ -248,27 +251,35 @@ const MAX_BROCHURE_BYTES = 15 * 1024 * 1024; // matches Vercel's request-body ce
 export async function uploadBrochure(businessId: string, formData: FormData): Promise<ActionResult> {
   const file = formData.get("brochure");
   if (!(file instanceof File) || file.size === 0) {
-    return { ok: false, message: "Choose a PDF or text file to upload." };
+    return { ok: false, message: "Choose a PDF, text, JPG, or PNG file to upload." };
   }
   if (file.size > MAX_BROCHURE_BYTES) {
     return { ok: false, message: "File is too large — please split it into smaller batches." };
   }
 
-  let text: string;
-  if (file.type === "application/pdf") {
-    const buffer = Buffer.from(await file.arrayBuffer());
-    try {
-      text = await extractTextFromPdf(buffer);
-    } catch {
-      return { ok: false, message: "Could not read this PDF — it may be scanned images without a text layer." };
+  let items: Awaited<ReturnType<typeof extractKnowledgeItems>>;
+  if (file.type === "image/jpeg" || file.type === "image/png") {
+    if (file.size > MAX_BROCHURE_IMAGE_BYTES) {
+      return { ok: false, message: "This image is over 5MB — please upload a smaller or lower-resolution version." };
     }
-  } else if (file.type === "text/plain") {
-    text = await file.text();
+    items = await extractKnowledgeItemsFromImage(Buffer.from(await file.arrayBuffer()), file.type);
   } else {
-    return { ok: false, message: "Please upload a PDF or plain text (.txt) file." };
+    let text: string;
+    if (file.type === "application/pdf") {
+      const buffer = Buffer.from(await file.arrayBuffer());
+      try {
+        text = await extractTextFromPdf(buffer);
+      } catch {
+        return { ok: false, message: "Could not read this PDF — it may be scanned images without a text layer." };
+      }
+    } else if (file.type === "text/plain") {
+      text = await file.text();
+    } else {
+      return { ok: false, message: "Please upload a PDF, plain text (.txt), JPG, or PNG file." };
+    }
+    items = await extractKnowledgeItems(text);
   }
 
-  const items = await extractKnowledgeItems(text);
   if (items === null) {
     return { ok: false, message: "Could not extract knowledge items from this document — please try again." };
   }

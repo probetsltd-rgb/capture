@@ -184,3 +184,45 @@ export async function extractKnowledgeItems(
     throw error;
   }
 }
+
+// Founder request 2026-11-23: price lists and product brochures often exist
+// only as a photo/screenshot (a phone picture of a printed menu, a designed
+// JPG/PNG), not a text-layer PDF. This is the one multi-modal path in the
+// file — the module header's reasoning for staying text-only predates this
+// and still applies to every other source. Same schema, same prompt, same
+// null-on-failure discipline, and the caller still inserts the results
+// UNAPPROVED, so a misread price never reaches the AI without a human
+// confirming it. The prompt tells the model to skip anything it can't read
+// confidently rather than guess, since a wrong digit in a price is worse
+// than a missing item.
+const IMAGE_SYSTEM_PROMPT = `${DOCUMENT_SYSTEM_PROMPT}
+6. The document is provided as an image. Only extract text you can read clearly. If a price, name, or variant is blurry, cut off, or ambiguous, leave that item out entirely rather than guessing digits or words.`;
+
+export async function extractKnowledgeItemsFromImage(
+  image: Buffer,
+  mediaType: "image/jpeg" | "image/png",
+): Promise<ExtractedKnowledgeItem[] | null> {
+  try {
+    const { object } = await generateObject({
+      model: MODEL,
+      schema: extractionSchema,
+      system: IMAGE_SYSTEM_PROMPT,
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: "Extract knowledge items from this document image." },
+            { type: "file", mediaType, data: image },
+          ],
+        },
+      ],
+    });
+    return object.items;
+  } catch (error) {
+    if (NoObjectGeneratedError.isInstance(error)) {
+      console.error("extractKnowledgeItemsFromImage: model output failed schema validation", error.cause);
+      return null;
+    }
+    throw error;
+  }
+}
